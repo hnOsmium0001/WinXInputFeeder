@@ -15,7 +15,7 @@ ConfigEvents gConfigEvents;
 void ReloadConfigFromDesignatedPath() {
     // Load config from the designated config file
     WCHAR buf[MAX_PATH];
-    DWORD numChars = GetModuleFileNameW(gHModule, buf, MAX_PATH);
+    DWORD numChars = GetModuleFileNameW(nullptr, buf, MAX_PATH); // Returns .exe file path
     auto configPath = std::filesystem::path(buf, buf + numChars).remove_filename() / L"WinXInputEmu.toml";
 
     LOG_DEBUG(L"Designated config path: {}", configPath.native());

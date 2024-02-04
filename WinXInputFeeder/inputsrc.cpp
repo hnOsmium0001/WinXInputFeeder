@@ -306,7 +306,7 @@ static void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed, InputTransla
     }
 }
 
-static bool HandleHotkeys(BYTE vkey, ThreadState& s) {
+static bool HandleHotkeys(USHORT vkey, ThreadState& s) {
     if (vkey == gConfig.hotkeyShowUI) {
         ShowWindow(s.mainWindow, SW_SHOWNORMAL);
         SetFocus(s.mainWindow);
@@ -623,7 +623,7 @@ void RunInputSource() {
 
         NULL,  // Parent window    
         NULL,  // Menu
-        gHModule, // Instance handle
+        NULL, // Instance handle
         NULL   // Additional application data
     );
     if (s.mainWindow == nullptr) {
@@ -641,7 +641,8 @@ void RunInputSource() {
     ShowWindow(s.mainWindow, SW_SHOWDEFAULT);
     UpdateWindow(s.mainWindow);
 
-    RAWINPUTDEVICE rid[2];
+    constexpr UINT kNumRid = 2;
+    RAWINPUTDEVICE rid[kNumRid];
 
     // We don't use RIDEV_NOLEGACY because all the window manipulation (e.g. dragging the title bar) relies on the "legacy messages"
     // RIDEV_INPUTSINK so that we get input even if the game window is current in focus instead
@@ -655,7 +656,7 @@ void RunInputSource() {
     rid[1].usUsage = HID_USAGE_GENERIC_MOUSE;
     rid[1].hwndTarget = s.mainWindow;
 
-    if (RegisterRawInputDevices(rid, std::size(rid), sizeof(RAWINPUTDEVICE)) == false) {
+    if (RegisterRawInputDevices(rid, kNumRid, sizeof(RAWINPUTDEVICE)) == false) {
         return;
     }
 
@@ -717,7 +718,7 @@ cleanup:
     CleanupDeviceD3D(s);
     // Do we actually need this?
     //DestroyWindow(s.mainWindow);
-    UnregisterClassW(MAKEINTATOM(atom), gHModule);
+    UnregisterClassW(MAKEINTATOM(atom), nullptr);
 
     LOG_DEBUG(L"Stopping working thread");
 }

@@ -3,20 +3,20 @@
 #include "utils.hpp"
 
 std::wstring Utf8ToWide(std::string_view utf8) {
-    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), utf8.size(), nullptr, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
     std::wstring result;
     result.resize_and_overwrite(
         len,
-        [utf8](wchar_t* buf, size_t bufSize) { return MultiByteToWideChar(CP_UTF8, 0, utf8.data(), utf8.size(), buf, bufSize); });
+        [utf8](wchar_t* buf, size_t bufSize) { return MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), buf, static_cast<int>(bufSize)); });
     return result;
 }
 
 std::string WideToUtf8(std::wstring_view wide) {
-    int len = WideCharToMultiByte(CP_UTF8, 0, wide.data(), wide.size(), nullptr, 0, nullptr, nullptr);
+    int len = WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0, nullptr, nullptr);
     std::string result;
     result.resize_and_overwrite(
         len,
-        [wide](char* buf, size_t bufSize) { return WideCharToMultiByte(CP_UTF8, 0, wide.data(), wide.size(), buf, bufSize, nullptr, nullptr); });
+        [wide](char* buf, size_t bufSize) { return WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), buf, static_cast<int>(bufSize), nullptr, nullptr); });
     return result;
 
 }
