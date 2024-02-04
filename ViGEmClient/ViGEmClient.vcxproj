@@ -71,23 +71,23 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <PublicIncludeDirectories>$(ProjectDir)</PublicIncludeDirectories>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <PublicIncludeDirectories>$(ProjectDir)</PublicIncludeDirectories>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <PublicIncludeDirectories>$(ProjectDir)</PublicIncludeDirectories>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)\out\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</OutDir>
+    <IntDir>$(SolutionDir)\out\$(Platform)_$(Configuration)\$(ProjectName)\</IntDir>
     <PublicIncludeDirectories>$(ProjectDir)</PublicIncludeDirectories>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
