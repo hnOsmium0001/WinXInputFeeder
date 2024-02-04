@@ -1,4 +1,6 @@
-﻿#include "inputsrc.hpp"
+﻿#include "pch.hpp"
+
+#include "inputsrc.hpp"
 
 #include "userconfig.hpp"
 #include "gamepad.hpp"

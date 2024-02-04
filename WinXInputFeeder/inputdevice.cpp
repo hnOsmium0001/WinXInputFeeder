@@ -1,3 +1,5 @@
+#include "pch.hpp"
+
 #include "inputdevice.hpp"
 
 #include <cassert>

@@ -1,3 +1,5 @@
+#include "pch.hpp"
+
 #include "gamepad.hpp"
 
 XINPUT_GAMEPAD XiGamepad::ComputeXInputGamepad() const noexcept {

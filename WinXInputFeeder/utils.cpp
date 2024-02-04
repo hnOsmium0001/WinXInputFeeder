@@ -1,3 +1,5 @@
+#include "pch.hpp"
+
 #include "utils.hpp"
 
 std::wstring Utf8ToWide(std::string_view utf8) {

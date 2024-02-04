@@ -1,3 +1,5 @@
+#include "pch.hpp"
+
 #include "ui.hpp"
 
 #include "gamepad.hpp"
