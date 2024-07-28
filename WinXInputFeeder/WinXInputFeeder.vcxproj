@@ -187,7 +187,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="userconfig.hpp" />
-    <ClInclude Include="export.h" />
     <ClInclude Include="inputdevice.hpp" />
     <ClInclude Include="inputsrc.hpp" />
     <ClInclude Include="pch.hpp" />

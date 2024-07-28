@@ -48,9 +48,6 @@
 #include <imgui_stdlib.h>
 #include <toml++/toml.h>
 
-// We don't include Xinput.h because dllmain.cpp wants separate declarations -- adding __declspec(dllexport), which is incompatible from the ones in Xinput.h
-// We instead cherry-picked declarations from Windows SDK's Xinput.h into shadowed.h
-
 ////////// Project headers //////////
 
 #include "export.h"

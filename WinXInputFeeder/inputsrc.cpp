@@ -103,7 +103,7 @@ void InputTranslationStruct::PopulateBtnLut(int userIndex, const UserProfile& pr
 #undef BTN
 }
 
-struct ThreadState {
+struct AppState {
     UIState* uiState = nullptr;
 
     std::vector<IdevDevice> devices;
@@ -120,6 +120,7 @@ struct ThreadState {
     HWND mainWindow = NULL;
 
     // For a RAWINPUT*
+    // We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end
     std::unique_ptr<std::byte[]> rawinput;
     size_t rawinputSize = 0;
 
@@ -306,7 +307,7 @@ static void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed, InputTransla
     }
 }
 
-static bool HandleHotkeys(USHORT vkey, ThreadState& s) {
+static bool HandleHotkeys(USHORT vkey, AppState& s) {
     if (vkey == gConfig.hotkeyShowUI) {
         ShowWindow(s.mainWindow, SW_SHOWNORMAL);
         SetFocus(s.mainWindow);
@@ -360,28 +361,28 @@ static bool HandleHotkeys(USHORT vkey, ThreadState& s) {
     return false;
 }
 
-static void CleanupRenderTarget(ThreadState& s) {
+static void CleanupRenderTarget(AppState& s) {
     if (s.mainRenderTargetView) {
         s.mainRenderTargetView->Release();
         s.mainRenderTargetView = nullptr;
     }
 }
 
-static void CleanupDeviceD3D(ThreadState& s) {
+static void CleanupDeviceD3D(AppState& s) {
     CleanupRenderTarget(s);
     if (s.swapChain) { s.swapChain->Release(); s.swapChain = nullptr; }
     if (s.d3dDeviceContext) { s.d3dDeviceContext->Release(); s.d3dDeviceContext = nullptr; }
     if (s.d3dDevice) { s.d3dDevice->Release(); s.d3dDevice = nullptr; }
 }
 
-static void CreateRenderTarget(ThreadState& s) {
+static void CreateRenderTarget(AppState& s) {
     ID3D11Texture2D* backBuffer;
     s.swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
     s.d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &s.mainRenderTargetView);
     backBuffer->Release();
 }
 
-static bool CreateDeviceD3D(ThreadState& s, HWND hWnd) {
+static bool CreateDeviceD3D(AppState& s, HWND hWnd) {
     // Setup swap chain
     DXGI_SWAP_CHAIN_DESC sd;
     ZeroMemory(&sd, sizeof(sd));
@@ -417,11 +418,11 @@ static bool CreateDeviceD3D(ThreadState& s, HWND hWnd) {
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-static LRESULT CALLBACK InputSrc_WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept {
+static LRESULT CALLBACK MyWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept {
     if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
         return true;
 
-    auto& s = *(ThreadState*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+    auto& s = *(AppState*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 
     switch (uMsg) {
     case WM_TIMER: {
@@ -583,37 +584,36 @@ static LRESULT CALLBACK InputSrc_WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
-void RunInputSource() {
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     LOG_DEBUG(L"Starting input source window");
 
-    ThreadState s;
+    AppState s;
     UIState us;
     s.uiState = &us;
 
     gConfigEvents.onMouseCheckFrequencyChanged += [&](int newFrequency) {
         SetTimer(nullptr, kMouseCheckTimerID, newFrequency, nullptr);
-        };
+    };
     gConfigEvents.onGamepadBindingChanged += [&](int userIndex, const std::string& profileName, const UserProfile& profile) {
         s.its.PopulateBtnLut(userIndex, profile);
-        };
+    };
     ReloadConfigFromDesignatedPath();
 
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(wc);
-    wc.lpfnWndProc = InputSrc_WndProc;
-    // TODO
-    //wc.hInstance = gHModule;
-    wc.lpszClassName = L"WinXInputEmu";
+    wc.lpfnWndProc = MyWndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"WinXInputFeeder Config";
     ATOM atom = RegisterClassExW(&wc);
     if (!atom) {
-        LOG_DEBUG(L"Error creating Input Source window class: {}", GetLastErrorStr());
+        LOG_DEBUG(L"Error creating main window class: {}", GetLastErrorStr());
         return;
     }
 
     s.mainWindow = CreateWindowExW(
         0,
         MAKEINTATOM(atom),
-        L"WinXInputEmu Config",
+        L"WinXInputFeeder Config",
         WS_OVERLAPPEDWINDOW,
 
         // Position
@@ -623,11 +623,11 @@ void RunInputSource() {
 
         NULL,  // Parent window    
         NULL,  // Menu
-        NULL, // Instance handle
+        NULL,  // Instance handle
         NULL   // Additional application data
     );
     if (s.mainWindow == nullptr) {
-        LOG_DEBUG(L"Error creating Input Source window: {}", GetLastErrorStr());
+        LOG_DEBUG(L"Error creating main window: {}", GetLastErrorStr());
         return;
     }
 
@@ -665,7 +665,7 @@ void RunInputSource() {
     ImGui::CreateContext();
     auto& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.IniFilename = "WinXInputEmu.imgui-state";
+    io.IniFilename = "WinXInputFeeder.imgui-state";
 
     ImGui_ImplWin32_Init(s.mainWindow);
     ImGui_ImplDX11_Init(s.d3dDevice, s.d3dDeviceContext);
@@ -721,4 +721,6 @@ cleanup:
     UnregisterClassW(MAKEINTATOM(atom), nullptr);
 
     LOG_DEBUG(L"Stopping working thread");
+
+    return 0;
 }
