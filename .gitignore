@@ -397,5 +397,16 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
-# NOTE(hnOsmium0001): exclude .filters files because they are purely for views in the editor
+# NOTE(hnOsmium0001): custom additions from template
+# Exclude .filters files because they are purely for views in the editor
 *.filters
+# Our MSBuild artifacts dir
+/out/
+# Used by clangd
+/.cache/
+compile_commands.json
+# Personal scripts
+/.local/
+
+# ImGui application state files
+*.imgui-state
