@@ -12,6 +12,11 @@ struct ViGEm {
 
 	ViGEm();
 	~ViGEm();
+
+	ViGEm(const ViGEm&) = delete;
+	ViGEm& operator=(const ViGEm&) = delete;
+	ViGEm(ViGEm&&);
+	ViGEm& operator=(ViGEm&&);
 };
 
 struct X360Gamepad {
@@ -29,6 +34,11 @@ struct X360Gamepad {
 
 	X360Gamepad(const ViGEm& client);
 	~X360Gamepad();
+
+	X360Gamepad(const X360Gamepad&) = delete;
+	X360Gamepad& operator=(const X360Gamepad&) = delete;
+	X360Gamepad(X360Gamepad&&);
+	X360Gamepad& operator=(X360Gamepad&&);
 
 	void SetButton(XUSB_BUTTON, bool onoff) noexcept;
 	void SetLeftTrigger(BYTE val) noexcept { state.bLeftTrigger = val; }
