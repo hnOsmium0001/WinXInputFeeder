@@ -39,6 +39,7 @@
 #include <Rpc.h>
 #include <hidusage.h>
 #include <tlhelp32.h>
+#include <shellapi.h>
 
 ////////// 3rd party headers //////////
 
@@ -47,8 +48,3 @@
 #include <imgui_impl_win32.h>
 #include <imgui_stdlib.h>
 #include <toml++/toml.h>
-
-////////// Project headers //////////
-
-#include "export.h"
-#include "utils.hpp"

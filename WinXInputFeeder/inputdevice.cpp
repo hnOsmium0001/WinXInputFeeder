@@ -2,6 +2,8 @@
 
 #include "inputdevice.hpp"
 
+#include "utils.hpp"
+
 #include <cassert>
 #include <initializer_list>
 #include <unordered_map>

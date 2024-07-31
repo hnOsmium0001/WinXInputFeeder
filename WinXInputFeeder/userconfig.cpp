@@ -16,7 +16,7 @@ void ReloadConfigFromDesignatedPath() {
     // Load config from the designated config file
     WCHAR buf[MAX_PATH];
     DWORD numChars = GetModuleFileNameW(nullptr, buf, MAX_PATH); // Returns .exe file path
-    auto configPath = std::filesystem::path(buf, buf + numChars).remove_filename() / L"WinXInputEmu.toml";
+    auto configPath = std::filesystem::path(buf, buf + numChars).remove_filename() / L"WinXInputFeeder.toml";
 
     LOG_DEBUG(L"Designated config path: {}", configPath.native());
 
@@ -28,8 +28,6 @@ void ReloadConfig(const std::filesystem::path& path) {
     
     gConfigEvents.onMouseCheckFrequencyChanged(gConfig.mouseCheckFrequency);
 
-    SrwExclusiveLock lock(gXiGamepadsLock);
-
     for (int userIndex = 0; userIndex < 4; ++userIndex) {
         const auto& profileName = gConfig.xiGamepadBindings[userIndex];
         if (profileName.empty()) continue;
@@ -38,9 +36,10 @@ void ReloadConfig(const std::filesystem::path& path) {
         if (iter != gConfig.profiles.end()) {
             const auto& profile = iter->second;
             LOG_DEBUG(L"Binding profile '{}' to gamepad {}", Utf8ToWide(profileName), userIndex);
-            gXiGamepadsEnabled[userIndex] = true;
-            gXiGamepads[userIndex] = {};
-            gXiGamepads[userIndex].profile = &profile;
+            SrwExclusiveLock lock(gX360GamepadsLock);
+            gX360GamepadsEnabled[userIndex] = true;
+            gX360Gamepads[userIndex] = {};
+            gX360Gamepads[userIndex].profile = &profile;
             gConfigEvents.onGamepadBindingChanged(userIndex, profileName, profile);
         }
         else {
@@ -53,11 +52,11 @@ toml::table StringifyConfig(const Config& config)  noexcept {
     return {}; // TODO
 }
 
-static void ReadButton(toml::node_view<const toml::node> t, UserProfile::Button& btn) {
+static void ReadButton(toml::node_view<const toml::node> t, Button& btn) {
     btn.keyCode = KeyCodeFromString(t.value_or<std::string_view>(""sv)).value_or(0xFF);
 }
 
-static void ReadJoystick(toml::node_view<const toml::node> t, UserProfile::Joystick& js, UserProfile::Button& jsBtn) {
+static void ReadJoystick(toml::node_view<const toml::node> t, Joystick& js, Button& jsBtn) {
     ReadButton(t["Button"], jsBtn);
 
     if (const auto& v = t["Type"];
@@ -135,8 +134,8 @@ Config LoadConfig(const toml::table& toml) noexcept {
 }
 
 void BindProfileToGamepad(int userIndex, const UserProfile& profile) {
-    SrwExclusiveLock lock(gXiGamepadsLock);
-    gXiGamepadsEnabled[userIndex] = true;
-    gXiGamepads[userIndex] = {};
-    gXiGamepads[userIndex].profile = &profile;
+    SrwExclusiveLock lock(gX360GamepadsLock);
+    gX360GamepadsEnabled[userIndex] = true;
+    gX360Gamepads[userIndex] = {};
+    gX360Gamepads[userIndex].profile = &profile;
 }

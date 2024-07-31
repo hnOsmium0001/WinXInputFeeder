@@ -21,21 +21,40 @@ std::string WideToUtf8(std::wstring_view wide) {
 
 }
 
-std::wstring GetLastErrorStr() noexcept {
+static bool GetLastErrorMessage(LPWSTR& msgBuf, size_t& size) noexcept {
     // https://stackoverflow.com/a/17387176
     DWORD errId = ::GetLastError();
-    if (errId == 0) {
-        return std::wstring();
-    }
+    if (errId == 0)
+        return false;
 
-    LPWSTR messageBuffer = nullptr;
-    size_t size = FormatMessageW(
+    msgBuf = nullptr;
+    size = FormatMessageW(
         FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr, errId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&messageBuffer, 0, NULL);
+        nullptr, errId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(&msgBuf), 0, NULL);
 
-    std::wstring errMsg(messageBuffer, size);
-    LocalFree(messageBuffer);
-    return errMsg;
+    return true;
+}
+
+std::wstring GetLastErrorStr() noexcept {
+    LPWSTR msgBuf;
+    size_t size;
+    if (!GetLastErrorMessage(msgBuf, size))
+        return {};
+
+    std::wstring msg(msgBuf, size);
+    LocalFree(msgBuf);
+    return msg;
+}
+
+std::string GetLastErrorStrUtf8() noexcept {
+    LPWSTR msgBuf;
+    size_t size;
+    if (!GetLastErrorMessage(msgBuf, size))
+        return {};
+
+    std::string msg(WideToUtf8(std::wstring_view(msgBuf, size)));
+    LocalFree(msgBuf);
+    return msg;
 }
 
 toml::table toml::parse_file(const std::filesystem::path& path) {
@@ -45,7 +64,7 @@ toml::table toml::parse_file(const std::filesystem::path& path) {
     char fileBuffer[sizeof(void*) * 1024];
     file.rdbuf()->pubsetbuf(fileBuffer, sizeof(fileBuffer));
     // This should use the -W version of CreateFile, etc. because open() takes an overload that handles fs::path directly
-    // Unlike toml++, which doesn't take fs::path, so we have to pass in std::wstring, which then gets converted to UTF-8 nicely but then relies on the codepage for the -A versions
+    // Unlike toml++, which doesn't take fs::path, sowe have to pass in std::wstring, which then gets converted to UTF-8 nicely but then relies on the codepage for the -A versions
     file.open(path, std::ios::in | std::ios::binary);
     if (!file.is_open())
         throw toml::parse_error("File could not be opened for reading", source_position{}, std::make_shared<const std::string>(path.string()));

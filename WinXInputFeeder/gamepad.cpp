@@ -2,40 +2,27 @@
 
 #include "gamepad.hpp"
 
-XUSB_REPORT XiGamepad::ComputeXInputGamepad() const noexcept {
-    XUSB_REPORT res = {};
-
-    if (a) res.wButtons |= XUSB_GAMEPAD_A;
-    if (b) res.wButtons |= XUSB_GAMEPAD_B;
-    if (x) res.wButtons |= XUSB_GAMEPAD_X;
-    if (y) res.wButtons |= XUSB_GAMEPAD_Y;
-
-    if (lb) res.wButtons |= XUSB_GAMEPAD_LEFT_SHOULDER;
-    if (rb) res.wButtons |= XUSB_GAMEPAD_RIGHT_SHOULDER;
-
-    res.bLeftTrigger = lt ? 255 : 0;
-    res.bRightTrigger = rt ? 255 : 0;
-
-    if (start) res.wButtons |= XUSB_GAMEPAD_START;
-    if (back) res.wButtons |= XUSB_GAMEPAD_BACK;
-
-    if (dpadUp) res.wButtons |= XUSB_GAMEPAD_DPAD_UP;
-    if (dpadDown) res.wButtons |= XUSB_GAMEPAD_DPAD_DOWN;
-    if (dpadLeft) res.wButtons |= XUSB_GAMEPAD_DPAD_LEFT;
-    if (dpadRight) res.wButtons |= XUSB_GAMEPAD_DPAD_RIGHT;
-
-    if (lstickBtn) res.wButtons |= XUSB_GAMEPAD_LEFT_THUMB;
-    if (rstickBtn) res.wButtons |= XUSB_GAMEPAD_RIGHT_THUMB;
-
-    res.sThumbLX = lstickX;
-    res.sThumbLY = lstickY;
-    res.sThumbRX = rstickX;
-    res.sThumbRY = rstickY;
-
-    return res;
+void X360Gamepad::SetButton(XUSB_BUTTON btn, bool onoff) noexcept {
+	switch (btn) {
+#define CASE(e) case e: if (onoff) state.wButtons |= e; else state.wButtons &= ~e; break
+		CASE(XUSB_GAMEPAD_DPAD_UP);
+		CASE(XUSB_GAMEPAD_DPAD_DOWN);
+		CASE(XUSB_GAMEPAD_DPAD_LEFT);
+		CASE(XUSB_GAMEPAD_DPAD_RIGHT);
+		CASE(XUSB_GAMEPAD_START);
+		CASE(XUSB_GAMEPAD_BACK);
+		CASE(XUSB_GAMEPAD_LEFT_THUMB);
+		CASE(XUSB_GAMEPAD_RIGHT_THUMB);
+		CASE(XUSB_GAMEPAD_LEFT_SHOULDER);
+		CASE(XUSB_GAMEPAD_RIGHT_SHOULDER);
+		CASE(XUSB_GAMEPAD_GUIDE);
+		CASE(XUSB_GAMEPAD_A);
+		CASE(XUSB_GAMEPAD_B);
+		CASE(XUSB_GAMEPAD_X);
+		CASE(XUSB_GAMEPAD_Y);
+	}
 }
 
-
-SRWLOCK gXiGamepadsLock = SRWLOCK_INIT;
-bool gXiGamepadsEnabled[4] = {};
-XiGamepad gXiGamepads[4] = {};
+SRWLOCK gX360GamepadsLock = SRWLOCK_INIT;
+bool gX360GamepadsEnabled[4] = {};
+X360Gamepad gX360Gamepads[4] = {};
