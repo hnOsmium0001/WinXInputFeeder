@@ -168,6 +168,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Internal.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="UniUtil.h" />
     <ClInclude Include="ViGEm\Client.h" />
     <ClInclude Include="ViGEm\Common.h" />

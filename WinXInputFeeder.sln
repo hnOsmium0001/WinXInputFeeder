@@ -4,9 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinXInputFeeder", "WinXInputFeeder\WinXInputFeeder.vcxproj", "{A186C80B-AE36-4364-BBC1-2E6DA2631ABA}"
-	ProjectSection(ProjectDependencies) = postProject
-		{F1AF4C70-DF0E-4D97-9EA3-C7C2521926A5} = {F1AF4C70-DF0E-4D97-9EA3-C7C2521926A5}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ViGEmClient", "ViGEmClient\ViGEmClient.vcxproj", "{F1AF4C70-DF0E-4D97-9EA3-C7C2521926A5}"
 EndProject
