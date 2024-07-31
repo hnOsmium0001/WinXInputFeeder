@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gamepad.hpp"
 #include "inputdevice.hpp"
 #include "userconfig.hpp"
 #include "ui.hpp"
@@ -24,13 +25,6 @@ enum class XiButton : unsigned char {
 // used for translating input key presses/mouse movements into gamepad state
 struct InputTranslationStruct {
 	struct {
-		struct {
-			// Keyboard mode stuff
-			bool up, down, left, right;
-
-			// Mouse mode stuff
-		} lstick, rstick;
-
 		float accuMouseX;
 		float accuMouseY;
 	} sticks[4];
@@ -73,24 +67,19 @@ struct MainWindow {
 
 LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept;
 
-// Wrap as struct for RAII helper
-struct ViGEm {
-	PVIGEM_CLIENT hvigem;
-
-	ViGEm();
-	~ViGEm();
-};
-
 struct AppState {
 	HINSTANCE hInstance;
+
+	Config config;
+	ViGEm vigem;
+	std::vector<X360Gamepad> x360s;
+	//std::vector<DualShockGamepad> dualshocks;
+	InputTranslationStruct its;
 
 	MainWindow mainWindow;
 	UIState mainUI;
 
 	std::vector<IdevDevice> devices;
-	ViGEm vigem;
-
-	InputTranslationStruct its;
 
 	// For a RAWINPUT*
 	// We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end
@@ -98,10 +87,20 @@ struct AppState {
 	size_t rawinputSize = 0;
 
 	int shownWindowCount = 0;
+	bool configDirty = false;
 	bool capturingCursor = false;
 
 	AppState(HINSTANCE hInstance);
 	~AppState();
 
+	// Functions to update the config & other states
+	void ReloadConfig();
+	void OnPostLoadConfig();
+	void SetX360Profile(int gamepadId, Config::ProfileRef profile);
+	void StartRebindX360Device(int gamepadId);
+
 	void MainRenderFrame();
+
+	LRESULT OnRawInput(RAWINPUT*);
+	void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed);
 };

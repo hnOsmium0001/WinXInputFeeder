@@ -11,17 +11,16 @@
 #include <string_view>
 #include <toml++/toml.h>
 
-struct Button {
-	KeyCode keyCode = 0xFF;
-};
-
 struct Joystick {
 	// Keep both keyboard and mouse configurations in memory because:
 	// 1. both union{} and std::variant are pain in the ass to use
 	// 2. allows user to switch betweeen both configs without losing previous values
 
 	struct {
-		Button up, down, left, right;
+		KeyCode up = 0xFF;
+		KeyCode down = 0xFF;
+		KeyCode left = 0xFF;
+		KeyCode right = 0xFF;
 		// Range: [0,1] i.e. works as a percentage
 		float speed = 1.0f;
 	} kbd;
@@ -44,38 +43,44 @@ struct Joystick {
 };
 
 struct UserProfile {
-	Button a, b, x, y;
-	Button lb, rb;
-	Button lt, rt;
-	Button start, back;
-	Button dpadUp, dpadDown, dpadLeft, dpadRight;
-	Button lstickBtn, rstickBtn;
+	KeyCode a = 0xFF;
+	KeyCode b = 0xFF;
+	KeyCode x = 0xFF;
+	KeyCode y = 0xFF;
+
+	KeyCode lb = 0xFF;
+	KeyCode rb = 0xFF;
+
+	KeyCode lt = 0xFF;
+	KeyCode rt = 0xFF;
+
+	KeyCode start = 0xFF;
+	KeyCode back = 0xFF;
+
+	KeyCode dpadUp = 0xFF;
+	KeyCode dpadDown = 0xFF;
+	KeyCode dpadLeft = 0xFF;
+	KeyCode dpadRight = 0xFF;
+
+	KeyCode lstickBtn = 0xFF;
+	KeyCode rstickBtn = 0xFF;
+
 	Joystick lstick, rstick;
 };
 
 struct Config {
-	std::map<std::string, UserProfile, std::less<>> profiles;
-	std::array<std::string, 4> xiGamepadBindings;
+	using ProfileTable = std::map<std::string, UserProfile, std::less<>>;
+	using ProfileRef = ProfileTable::value_type*;
+
+	ProfileTable profiles;
+	ProfileRef x360s[4];
+	//std::vector<ProfileRef> dualshocks;
+	int x360Count = 0;
 	// Recommends 50-100
 	int mouseCheckFrequency = 75;
 	KeyCode hotkeyShowUI;
 	KeyCode hotkeyCaptureCursor;
 };
 
-// Container for all EventBus objects used for a given Config object
-// Since Config is just a plain old object, these need to be called by code that modifies the given Config object.
-struct ConfigEvents {
-	EventBus<void(int)> onMouseCheckFrequencyChanged;
-	EventBus<void(int userIndex, const std::string& profileName, const UserProfile& profile)> onGamepadBindingChanged;
-};
-
-extern Config gConfig;
-extern ConfigEvents gConfigEvents;
-void ReloadConfigFromDesignatedPath();
-void ReloadConfig(const std::filesystem::path& path);
-
 toml::table StringifyConfig(const Config&) noexcept;
 Config LoadConfig(const toml::table&) noexcept;
-
-// Lock: built-in
-void BindProfileToGamepad(int userIndex, const UserProfile& profile);

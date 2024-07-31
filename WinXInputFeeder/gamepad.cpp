@@ -1,6 +1,36 @@
 #include "pch.hpp"
 
+#include <format>
+#include <stdexcept>
+
 #include "gamepad.hpp"
+
+ViGEm::ViGEm()
+	: hvigem{ vigem_alloc() }
+{
+	VIGEM_ERROR err;
+
+	err = vigem_connect(hvigem);
+	if (err != VIGEM_ERROR_NONE)
+		throw std::runtime_error(std::format("Failed to connect ViGEm bus"));
+}
+
+ViGEm::~ViGEm() {
+	vigem_disconnect(hvigem);
+	vigem_free(hvigem);
+}
+
+X360Gamepad::X360Gamepad(const ViGEm& client)
+	: hvigem{ client.hvigem }
+	, htarget{ vigem_target_x360_alloc() }
+{
+	vigem_target_add(client.hvigem, htarget);
+}
+
+X360Gamepad::~X360Gamepad() {
+	vigem_target_remove(hvigem, htarget);
+	vigem_target_free(htarget);
+}
 
 void X360Gamepad::SetButton(XUSB_BUTTON btn, bool onoff) noexcept {
 	switch (btn) {
@@ -23,6 +53,6 @@ void X360Gamepad::SetButton(XUSB_BUTTON btn, bool onoff) noexcept {
 	}
 }
 
-SRWLOCK gX360GamepadsLock = SRWLOCK_INIT;
-bool gX360GamepadsEnabled[4] = {};
-X360Gamepad gX360Gamepads[4] = {};
+void X360Gamepad::SendReport() {
+	vigem_target_x360_update(hvigem, htarget, state);
+}

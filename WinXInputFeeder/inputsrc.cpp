@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <d3d11.h>
+#include <filesystem>
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
@@ -20,6 +21,9 @@
 #include <utility>
 #include <vector>
 #include <hidusage.h>
+
+namespace fs = std::filesystem;
+using namespace std::literals;
 
 constexpr UINT_PTR kMouseCheckTimerID = 0;
 
@@ -38,7 +42,7 @@ void InputTranslationStruct::PopulateBtnLut(int userIndex, const UserProfile& pr
 		btn = XiButton::None;
 
 	using enum XiButton;
-#define BTN(KEY_ENUM, THE_BTN) if (THE_BTN.keyCode != 0xFF) btns[userIndex][THE_BTN.keyCode] = KEY_ENUM;
+#define BTN(KEY_ENUM, THE_BTN) if (THE_BTN != 0xFF) btns[userIndex][THE_BTN] = KEY_ENUM;
 	BTN(A, profile.a);
 	BTN(B, profile.b);
 	BTN(X, profile.x);
@@ -168,134 +172,79 @@ static void SetJoystickPosition(float phi, float tilt, bool invertX, bool invert
 //		extra.accuMouseY += dy;
 //	}
 //}
-//
-//static void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed, InputTranslationStruct& its) {
-//	for (int userIndex = 0; userIndex < 4; ++userIndex) {
-//		if (!gXiGamepadsEnabled[userIndex]) continue;
-//		if (IsKeyCodeMouseButton(vkey)) {
-//			HANDLE src = gXiGamepads[userIndex].srcMouse;
-//			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-//		}
-//		else {
-//			HANDLE src = gXiGamepads[userIndex].srcKbd;
-//			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-//		}
-//
-//		auto& dev = gXiGamepads[userIndex];
-//		auto& extra = its.sticks[userIndex];
-//
-//		bool recompute_lstick = false;
-//		bool recompute_rstick = false;
-//
-//		switch (its.btns[userIndex][vkey]) {
-//			using enum XiButton;
-//		case A: dev.a = pressed; break;
-//		case B: dev.b = pressed; break;
-//		case X: dev.x = pressed; break;
-//		case Y: dev.y = pressed; break;
-//
-//		case LB: dev.lb = pressed; break;
-//		case RB: dev.rb = pressed; break;
-//		case LT: dev.lt = pressed; break;
-//		case RT: dev.rt = pressed; break;
-//
-//		case Start: dev.start = pressed; break;
-//		case Back: dev.back = pressed; break;
-//
-//		case DpadUp: dev.dpadUp = pressed; break;
-//		case DpadDown: dev.dpadDown = pressed; break;
-//		case DpadLeft: dev.dpadLeft = pressed; break;
-//		case DpadRight: dev.dpadRight = pressed; break;
-//
-//		case LStickBtn: dev.lstickBtn = pressed; break;
-//		case RStickBtn: dev.rstickBtn = pressed; break;
-//
-//			// NOTE: we assume that if any key is setup for the joystick directions, it's on keyboard mode
-//			//       that is, we rely on the translation struct being populated from the current user config correctly
-//#define STICKBUTTON(THEENUM, STICK, DIR) case THEENUM: recompute_##STICK = true; extra.STICK.DIR = pressed; break;
-//			STICKBUTTON(LStickUp, lstick, up);
-//			STICKBUTTON(LStickDown, lstick, down);
-//			STICKBUTTON(LStickLeft, lstick, left);
-//			STICKBUTTON(LStickRight, lstick, right);
-//			STICKBUTTON(RStickUp, rstick, up);
-//			STICKBUTTON(RStickDown, rstick, down);
-//			STICKBUTTON(RStickLeft, rstick, left);
-//			STICKBUTTON(RStickRight, rstick, right);
-//#undef STICKBUTTON
-//
-//		case None: break;
-//		}
-//
-//		constexpr int kStickMaxVal = 32767;
-//		if (recompute_lstick) {
-//			// Stick's actual value per user's speed setting
-//			int val = (int)(kStickMaxVal * dev.profile->lstick.kbd.speed);
-//			dev.lstickX = (extra.lstick.right ? val : 0) + (extra.lstick.left ? -val : 0);
-//			dev.lstickY = (extra.lstick.up ? val : 0) + (extra.lstick.down ? -val : 0);
-//		}
-//		if (recompute_rstick) {
-//			int val = (int)(kStickMaxVal * dev.profile->rstick.kbd.speed);
-//			dev.rstickX = (extra.rstick.right ? val : 0) + (extra.rstick.left ? -val : 0);
-//			dev.rstickY = (extra.rstick.up ? val : 0) + (extra.rstick.down ? -val : 0);
-//		}
-//
-//		++dev.epoch;
-//	}
-//}
-//
-//static bool HandleHotkeys(USHORT vkey, AppState& s) {
-//	if (vkey == gConfig.hotkeyShowUI) {
-//		ShowWindow(s.mainWindow, SW_SHOWNORMAL);
-//		SetFocus(s.mainWindow);
-//		s.blockingMessagePump = false;
-//
-//		return true;
-//	}
-//	else if (vkey == gConfig.hotkeyCaptureCursor) {
-//		if (auto hostHwnd = s.mainUI->mainHostHwnd) {
-//			if (s.capturingCursor) {
-//				ClipCursor(nullptr);
-//				ShowCursor(true);
-//
-//				s.capturingCursor = false;
-//				LOG_DEBUG(L"Released cursor");
-//			}
-//			else {
-//				// Get window-space rect of client area
-//				RECT clientRect;
-//				GetClientRect(hostHwnd, &clientRect);
-//
-//				POINT tl;
-//				tl.x = clientRect.left;
-//				tl.y = clientRect.top;
-//				POINT br;
-//				br.x = clientRect.right;
-//				br.y = clientRect.bottom;
-//
-//				// Map window-space rect to screen-space
-//				MapWindowPoints(hostHwnd, nullptr, &tl, 1);
-//				MapWindowPoints(hostHwnd, nullptr, &br, 1);
-//
-//				RECT rect;
-//				rect.left = tl.x;
-//				rect.top = tl.y;
-//				rect.right = br.x;
-//				rect.bottom = br.y;
-//				ClipCursor(&rect);
-//				ShowCursor(false);
-//
-//				s.capturingCursor = true;
-//				LOG_DEBUG(L"Captured cursor");
-//			}
-//		}
-//		else {
-//			LOG_DEBUG(L"Main game window not selected, cannot capture cursor");
-//		}
-//
-//		return true;
-//	}
-//	return false;
-//}
+
+void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
+	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
+		auto& dev = x360s[gamepadId];
+		auto& profile = config.x360s[gamepadId]->second;
+
+		if (IsKeyCodeMouseButton(vkey)) {
+			HANDLE src = dev.srcMouse;
+			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
+
+			if (dev.pendingRebindDevice) {
+				dev.srcMouse = hDevice;
+				dev.pendingRebindDevice = false;
+			}
+		}
+		else {
+			HANDLE src = dev.srcKbd;
+			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
+
+			if (dev.pendingRebindDevice) {
+				dev.srcKbd = hDevice;
+				dev.pendingRebindDevice = false;
+			}
+		}
+
+		constexpr int kStickMaxVal = 32767;
+
+		switch (its.btns[gamepadId][vkey]) {
+			using enum XiButton;
+		case A: dev.SetButton(XUSB_GAMEPAD_A, pressed); break;
+		case B: dev.SetButton(XUSB_GAMEPAD_B, pressed); break;
+		case X: dev.SetButton(XUSB_GAMEPAD_X, pressed); break;
+		case Y: dev.SetButton(XUSB_GAMEPAD_Y, pressed); break;
+
+		case LB: dev.SetButton(XUSB_GAMEPAD_LEFT_SHOULDER, pressed); break;
+		case RB: dev.SetButton(XUSB_GAMEPAD_RIGHT_SHOULDER, pressed); break;
+		case LT: dev.SetLeftTrigger(pressed ? 0xFF : 0x00); break;
+		case RT: dev.SetRightTrigger(pressed ? 0xFF : 0x00); break;
+
+		case Start: dev.SetButton(XUSB_GAMEPAD_START, pressed); break;
+		case Back: dev.SetButton(XUSB_GAMEPAD_BACK, pressed); break;
+
+		case DpadUp: dev.SetButton(XUSB_GAMEPAD_DPAD_UP, pressed); break;
+		case DpadDown: dev.SetButton(XUSB_GAMEPAD_DPAD_DOWN, pressed); break;
+		case DpadLeft: dev.SetButton(XUSB_GAMEPAD_DPAD_LEFT, pressed); break;
+		case DpadRight: dev.SetButton(XUSB_GAMEPAD_DPAD_RIGHT, pressed); break;
+
+		case LStickBtn: dev.SetButton(XUSB_GAMEPAD_LEFT_THUMB, pressed); break;
+		case RStickBtn: dev.SetButton(XUSB_GAMEPAD_RIGHT_THUMB, pressed); break;
+
+			// NOTE: we assume that if any key is setup for the joystick directions, it's on keyboard mode
+			//       that is, we rely on the translation struct being populated from the current user config correctly
+
+			// Stick's actual value per user's speed setting
+			// (in config it's specified as a fraction between 0 to 1
+#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * profile.lstick.kbd.speed)
+			// TODO use the setters
+		case LStickUp: dev.state.sThumbLY += STICK_VALUE; break;
+		case LStickDown:dev.state.sThumbLY -= STICK_VALUE; break;
+		case LStickLeft: dev.state.sThumbLX -= STICK_VALUE; break;
+		case LStickRight: dev.state.sThumbLX += STICK_VALUE; break;
+		case RStickUp: dev.state.sThumbRY += STICK_VALUE; break;
+		case RStickDown:dev.state.sThumbRY -= STICK_VALUE; break;
+		case RStickLeft: dev.state.sThumbRX -= STICK_VALUE; break;
+		case RStickRight: dev.state.sThumbRX += STICK_VALUE; break;
+#undef STICK_VALUE
+
+		case None: break;
+		}
+
+		dev.SendReport();
+	}
+}
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -303,7 +252,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept {
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam))
 		return true;
-
 
 	switch (uMsg) {
 	case WM_NCCREATE: {
@@ -330,100 +278,41 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		if (wParam == SIZE_MINIMIZED)
 			return 0;
 
-		auto app = reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 		auto resizeWidth = static_cast<UINT>(LOWORD(lParam));
 		auto resizeHeight = static_cast<UINT>(HIWORD(lParam));
-		app->mainWindow.ResizeRenderTarget(resizeWidth, resizeHeight);
+		app.mainWindow.ResizeRenderTarget(resizeWidth, resizeHeight);
 		return 0;
 	}
 
 	case WM_CLOSE: {
-		auto app = reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+
 		ShowWindow(hWnd, SW_HIDE);
-		--app->shownWindowCount;
+		--app.shownWindowCount;
+
 		return 0;
 	}
 
 	case WM_INPUT: {
-		//HRAWINPUT hri = (HRAWINPUT)lParam;
+		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
-		//UINT size = 0;
-		//GetRawInputData(hri, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER));
-		//if (size > s.rawinputSize || s.rawinput == nullptr) {
-		//	s.rawinput = std::make_unique<std::byte[]>(size);
-		//	s.rawinputSize = size;
-		//}
+		HRAWINPUT hri = (HRAWINPUT)lParam;
 
-		//if (GetRawInputData(hri, RID_INPUT, s.rawinput.get(), &size, sizeof(RAWINPUTHEADER)) == (UINT)-1) {
-		//	LOG_DEBUG(L"GetRawInputData() failed");
-		//	break;
-		//}
-		//RAWINPUT* ri = (RAWINPUT*)s.rawinput.get();
+		UINT size = 0;
+		GetRawInputData(hri, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER));
+		if (size > app.rawinputSize || app.rawinput == nullptr) {
+			app.rawinput = std::make_unique<std::byte[]>(size);
+			app.rawinputSize = size;
+		}
 
-		//// We are going to modify/push data onto XiGamepad's below, from this input event
-		//SrwExclusiveLock lock(gXiGamepadsLock);
+		if (GetRawInputData(hri, RID_INPUT, app.rawinput.get(), &size, sizeof(RAWINPUTHEADER)) == (UINT)-1) {
+			LOG_DEBUG(L"GetRawInputData() failed");
+			break;
+		}
+		RAWINPUT* ri = reinterpret_cast<RAWINPUT*>(app.rawinput.get());
 
-		//switch (ri->header.dwType) {
-		//case RIM_TYPEMOUSE: {
-		//	const auto& mouse = ri->data.mouse;
-
-		//	// If any button is pressed...
-		//	if (mouse.usButtonFlags != 0) {
-		//		if (s.uiState->bindIdevFromNextMouse != -1) {
-		//			gXiGamepads[s.uiState->bindIdevFromNextMouse].srcMouse = ri->header.hDevice;
-		//			s.uiState->bindIdevFromNextMouse = -1;
-		//			break;
-		//		}
-		//	}
-
-		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, false, s.its);
-
-		//	if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
-		//		LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
-		//		break;
-		//	} // else: MOUSE_MOVE_RELATIVE
-
-		//	HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY, s.its);
-		//} break;
-
-		//case RIM_TYPEKEYBOARD: {
-		//	const auto& kbd = ri->data.keyboard;
-
-		//	// This message is a part of a longer makecode sequence -- the actual Vkey is in another one
-		//	if (kbd.VKey == 0xFF)
-		//		break;
-		//	// All of the relevant keys that we support fit in a BYTE
-		//	if (kbd.VKey > 0xFF)
-		//		break;
-
-		//	bool press = !(kbd.Flags & RI_KEY_BREAK);
-
-		//	// If any key is pressed...
-		//	if (press) {
-		//		if (HandleHotkeys(kbd.VKey, s))
-		//			break;
-
-		//		if (s.uiState->bindIdevFromNextKey != -1) {
-		//			gXiGamepads[s.uiState->bindIdevFromNextKey].srcKbd = ri->header.hDevice;
-		//			s.uiState->bindIdevFromNextKey = -1;
-		//			break;
-		//		}
-		//	}
-
-		//	HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press, s.its);
-		//} break;
-		//}
-
-		return 0;
+		return app.OnRawInput(ri);
 	}
 
 	case WM_INPUT_DEVICE_CHANGE: {
@@ -552,25 +441,42 @@ void MainWindow::ResizeRenderTarget(UINT width, UINT height) {
 	CreateRenderTarget();
 }
 
-ViGEm::ViGEm()
-	: hvigem{ vigem_alloc() }
-{
-	VIGEM_ERROR err;
-
-	err = vigem_connect(hvigem);
-	if (err != VIGEM_ERROR_NONE)
-		throw std::runtime_error(std::format("Failed to connect ViGEm bus"));
+void AppState::ReloadConfig() {
+	config = LoadConfig(toml::parse_file(fs::path(L"config.toml")));
 }
 
-ViGEm::~ViGEm() {
-	vigem_disconnect(hvigem);
-	vigem_free(hvigem);
+void AppState::OnPostLoadConfig() {
+	x360s.reserve(config.x360Count);
+	for (int i = 0; i < config.x360Count; ++i) {
+		auto& x360Conf = config.x360s[i];
+		x360s.push_back(X360Gamepad(vigem));
+		auto& x360Inst = x360s.back();
+
+		its.PopulateBtnLut(i, x360Conf->second);
+	}
+}
+
+void AppState::SetX360Profile(int gamepadId, Config::ProfileRef profile) {
+	// TODO
+	configDirty = true;
+}
+
+void AppState::StartRebindX360Device(int gamepadId) {
+	if (gamepadId < 0 || gamepadId >= x360s.size())
+		return;
+
+	auto& dev = x360s[gamepadId];
+	dev.pendingRebindDevice = true;
 }
 
 AppState::AppState(HINSTANCE hInstance)
 	: hInstance{ hInstance }
+	, config{ LoadConfig(toml::parse_file(fs::path(L"config.toml"))) }
 	, mainWindow(*this, hInstance)
+	, mainUI(*this)
 {
+	OnPostLoadConfig();
+
 	constexpr UINT kNumRid = 2;
 	RAWINPUTDEVICE rid[kNumRid];
 
@@ -597,7 +503,7 @@ AppState::AppState(HINSTANCE hInstance)
 	ImGui::CreateContext();
 	auto& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-	io.IniFilename = "WinXInputFeeder.imgui-state";
+	io.IniFilename = "imgui_state.ini";
 
 	ImGui_ImplWin32_Init(mainWindow.hWnd);
 	ImGui_ImplDX11_Init(mainWindow.d3dDevice, mainWindow.d3dDeviceContext);
@@ -629,20 +535,60 @@ void AppState::MainRenderFrame() {
 	mainWindow.swapChain->Present(1, 0); // Present with vsync
 }
 
-int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
-	LOG_DEBUG(L"Starting input source window");
+LRESULT AppState::OnRawInput(RAWINPUT* ri) {
+	switch (ri->header.dwType) {
+		//case RIM_TYPEMOUSE: {
+		//	const auto& mouse = ri->data.mouse;
 
+		//	// If any button is pressed...
+		//	if (mouse.usButtonFlags != 0) {
+		//		if (s.uiState->bindIdevFromNextMouse != -1) {
+		//			gXiGamepads[s.uiState->bindIdevFromNextMouse].srcMouse = ri->header.hDevice;
+		//			s.uiState->bindIdevFromNextMouse = -1;
+		//			break;
+		//		}
+		//	}
+
+		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, true, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, false, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, true, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, false, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, true, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, false, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, true, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, false, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, true, s.its);
+		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, false, s.its);
+
+		//	if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
+		//		LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
+		//		break;
+		//	} // else: MOUSE_MOVE_RELATIVE
+
+		//	HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY, s.its);
+		//} break;
+
+	case RIM_TYPEKEYBOARD: {
+		const auto& kbd = ri->data.keyboard;
+
+		// This message is a part of a longer makecode sequence -- the actual Vkey is in another one
+		if (kbd.VKey == 0xFF)
+			break;
+		// All of the relevant keys that we support fit in a BYTE
+		if (kbd.VKey > 0xFF)
+			break;
+
+		bool press = !(kbd.Flags & RI_KEY_BREAK);
+		HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
+	} break;
+	}
+
+	return 0;
+}
+
+int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
 	AppState s(hInstance);
 
-	gConfigEvents.onMouseCheckFrequencyChanged += [&](int newFrequency) {
-		SetTimer(nullptr, kMouseCheckTimerID, newFrequency, nullptr);
-		};
-	gConfigEvents.onGamepadBindingChanged += [&](int userIndex, const std::string& profileName, const UserProfile& profile) {
-		s.its.PopulateBtnLut(userIndex, profile);
-		};
-	ReloadConfigFromDesignatedPath();
-
-	LOG_DEBUG(L"Starting working thread's main loop");
 	while (true) {
 		MSG msg;
 

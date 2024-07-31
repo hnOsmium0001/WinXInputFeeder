@@ -2,6 +2,8 @@
 
 #include "ui.hpp"
 
+#include "inputsrc.hpp"
+#include "inputsrc_p.hpp" // TODO
 #include "gamepad.hpp"
 #include "utils.hpp"
 
@@ -26,21 +28,22 @@ struct UIStatePrivate {
 	}
 };
 
-UIState::UIState() 
-	: p{ new UIStatePrivate(*this) } {}
+UIState::UIState(AppState& app)
+	: p{ new UIStatePrivate(*this) }
+	, app{ &app } {}
 
 UIState::~UIState() {
 	delete p;
 }
 
 void UIState::Show() {
-	//auto& s = ;
+	auto& s = *app;
 	auto& p = *static_cast<UIStatePrivate*>(this->p);
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("WinXInputEmu")) {
 			if (ImGui::MenuItem("Reload config file")) {
-				ReloadConfigFromDesignatedPath();
+				s.ReloadConfig();
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Quit")) {
@@ -56,11 +59,11 @@ void UIState::Show() {
 	}
 
 	ImGui::Begin("Gamepads");
-	for (int userIndex = 0; userIndex < 4; ++userIndex) {
-		FORMAT_GAMEPAD_NAME(id, userIndex);
-		bool selected = p.selectedUserIndex == userIndex;
+	for (int gamepadId = 0; gamepadId < s.x360s.size(); ++gamepadId) {
+		FORMAT_GAMEPAD_NAME(id, gamepadId);
+		bool selected = p.selectedUserIndex == gamepadId;
 		if (ImGui::Selectable(id, &selected)) {
-			p.selectedUserIndex = userIndex;
+			p.selectedUserIndex = gamepadId;
 		}
 	}
 	ImGui::End();
@@ -68,51 +71,44 @@ void UIState::Show() {
 	ImGui::Begin("Gamepad info");
 	if (p.selectedUserIndex != -1) {
 		auto userIndex = p.selectedUserIndex;
-		auto& profileName = gConfig.xiGamepadBindings[userIndex];
+		auto& dev = s.x360s[userIndex];
+		auto&& [profileName, profile] = *s.config.x360s[userIndex];
 
-		if (ImGui::Button("Rebind##kdb")) {
-			//s.bindIdevFromNextKey = userIndex;
+		if (ImGui::Button("Rebind")) {
+			s.StartRebindX360Device(userIndex);
 		}
-		ImGui::SameLine();
+		if (dev.pendingRebindDevice) {
+			ImGui::SameLine();
+			ImGui::Text("Rebinding: press any key or mosue button");
+		}
+
 		if (ImGui::Button("Unbind##kdb")) {
-			SrwExclusiveLock lock(gX360GamepadsLock);
-			gX360Gamepads[userIndex].srcKbd = INVALID_HANDLE_VALUE;
+			s.x360s[userIndex].srcKbd = INVALID_HANDLE_VALUE;
 		}
 		ImGui::SameLine();
-		//if (s.bindIdevFromNextKey == userIndex)
-		//	ImGui::Text("Bound keyboard: [press any key]");
-		//else
-			if (gX360Gamepads[userIndex].srcKbd == INVALID_HANDLE_VALUE)
-				ImGui::Text("Bound keyboard: [any]");
-			else
-				ImGui::Text("Bound keyboard: %p", gX360Gamepads[userIndex].srcKbd);
+		if (dev.srcKbd == INVALID_HANDLE_VALUE)
+			ImGui::Text("Bound keyboard: [any]");
+		else
+			ImGui::Text("Bound keyboard: %p", dev.srcKbd);
 
-		if (ImGui::Button("Rebind##mouse")) {
-			//s.bindIdevFromNextMouse = userIndex;
-		}
-		ImGui::SameLine();
 		if (ImGui::Button("Unbind##mouse")) {
-			SrwExclusiveLock lock(gX360GamepadsLock);
-			gX360Gamepads[userIndex].srcMouse = INVALID_HANDLE_VALUE;
+			s.x360s[userIndex].srcMouse = INVALID_HANDLE_VALUE;
 		}
 		ImGui::SameLine();
-		//if (s.bindIdevFromNextMouse == userIndex)
-		//	ImGui::Text("Bound mouse: [press any mouse button]");
-		//else
-			if (gX360Gamepads[userIndex].srcMouse == INVALID_HANDLE_VALUE)
-				ImGui::Text("Bound mouse: [any]");
-			else
-				ImGui::Text("Bound mouse: %p", gX360Gamepads[userIndex].srcMouse);
+		if (dev.srcMouse == INVALID_HANDLE_VALUE)
+			ImGui::Text("Bound mouse: [any]");
+		else
+			ImGui::Text("Bound mouse: %p", dev.srcMouse);
 
-		if (ImGui::InputText("Profile name", &profileName)) {
-			auto iter = gConfig.profiles.find(profileName);
-			if (iter != gConfig.profiles.end()) {
-				auto& profile = iter->second;
-
-				LOG_DEBUG(L"UI: rebound gamepad {} to profile '{}'", userIndex, Utf8ToWide(profileName));
-				BindProfileToGamepad(userIndex, profile);
-				gConfigEvents.onGamepadBindingChanged(userIndex, profileName, profile);
+		if (ImGui::BeginCombo("Profile name", profileName.c_str())) {
+			for (auto& p : s.config.profiles) {
+				bool selected = &p.second == &profile;
+				if (ImGui::MenuItem(p.first.c_str(), nullptr, selected)) {
+					LOG_DEBUG(L"UI: rebound gamepad {} to profile '{}'", userIndex, Utf8ToWide(profileName));
+					s.SetX360Profile(userIndex, &p);
+				}
 			}
+			ImGui::EndCombo();
 		}
 	}
 	else {
