@@ -32,6 +32,7 @@ enum class X360Button : unsigned char {
 	/* XUSB_GAMEPAD_LEFT_SHOULDER */  LeftShoulder,
 	/* XUSB_GAMEPAD_RIGHT_SHOULDER */ RightShoulder,
 	/* XUSB_GAMEPAD_GUIDE */          Guide,
+	DUMMY,
 	/* XUSB_GAMEPAD_A */              A,
 	/* XUSB_GAMEPAD_B */              B,
 	/* XUSB_GAMEPAD_X */              X,

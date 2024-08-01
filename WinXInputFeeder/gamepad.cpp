@@ -57,6 +57,7 @@ constexpr std::string_view kX360ButtonStrings[] = {
 	"LB"sv,
 	"RB"sv,
 	"Guide"sv,
+	"DUMMY"sv,
 	"A"sv,
 	"B"sv,
 	"X"sv,
