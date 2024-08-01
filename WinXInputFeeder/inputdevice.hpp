@@ -4,18 +4,16 @@
 #include <string>
 #include <string_view>
 
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <minwindef.h>
 
 // Win32 Vkey keycode
 using KeyCode = BYTE;
 
 void InitKeyCodeConv();
-std::string_view KeyCodeToString(KeyCode key);
-std::optional<KeyCode> KeyCodeFromString(std::string_view str);
+std::string_view KeyCodeToString(KeyCode key) noexcept;
+std::optional<KeyCode> KeyCodeFromString(std::string_view str) noexcept;
 
-bool IsKeyCodeMouseButton(KeyCode key);
+bool IsKeyCodeMouseButton(KeyCode key) noexcept;
 
 GUID ParseRawInputDeviceGUID(std::wstring_view name);
 

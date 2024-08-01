@@ -21,10 +21,10 @@ ViGEm::~ViGEm() {
 	vigem_free(hvigem);
 }
 
-ViGEm::ViGEm(ViGEm&& that)
+ViGEm::ViGEm(ViGEm&& that) noexcept
 	: hvigem{ std::exchange(that.hvigem, nullptr) } {}
 
-ViGEm& ViGEm::operator=(ViGEm&& that) {
+ViGEm& ViGEm::operator=(ViGEm&& that) noexcept {
 	vigem_disconnect(hvigem);
 	vigem_free(hvigem);
 	hvigem = std::exchange(that.hvigem, nullptr);
@@ -47,11 +47,11 @@ X360Gamepad::~X360Gamepad() {
 	vigem_target_free(htarget);
 }
 
-X360Gamepad::X360Gamepad(X360Gamepad&& that)
+X360Gamepad::X360Gamepad(X360Gamepad&& that) noexcept
 	: hvigem{ std::exchange(that.hvigem, nullptr) }
 	, htarget{ std::exchange(that.htarget, nullptr) } {}
 
-X360Gamepad& X360Gamepad::operator=(X360Gamepad&& that) {
+X360Gamepad& X360Gamepad::operator=(X360Gamepad&& that) noexcept {
 	vigem_target_remove(hvigem, htarget);
 	vigem_target_free(htarget);
 	hvigem = std::exchange(that.hvigem, nullptr);

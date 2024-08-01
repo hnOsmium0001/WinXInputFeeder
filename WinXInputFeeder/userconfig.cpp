@@ -31,7 +31,7 @@ static void WriteJoystick(toml::table& profile, const Joystick& js, const KeyCod
 	}
 }
 
-toml::table SaveConfig(const Config& config) noexcept {
+toml::table SaveConfig(const Config& config) {
 	toml::table res;
 
 	toml::table general;
@@ -126,7 +126,7 @@ static void ReadJoystick(toml::node_view<const toml::node> t, Joystick& js, KeyC
 	}
 }
 
-Config LoadConfig(const toml::table& toml) noexcept {
+Config LoadConfig(const toml::table& toml) {
 	Config config;
 
 	config.mouseCheckFrequency = toml["General"]["MouseCheckFrequency"].value_or<int>(75);

@@ -233,11 +233,14 @@ void InitKeyCodeConv() {
     }
 }
 
-std::string_view KeyCodeToString(KeyCode key) {
+std::string_view KeyCodeToString(KeyCode key) noexcept {
     return gKeycode2Str[key];
 }
 
-std::optional<KeyCode> KeyCodeFromString(std::string_view str) {
+std::optional<KeyCode> KeyCodeFromString(std::string_view str) noexcept {
+    // find() noexcept-ness should be dependent on noexcept-ness of key_type::operator==() and hash<key_type>
+    // of which, std::string_view is noexcept on both
+    // this is not worded in the standard, but STL implementations should behave like this
     auto iter = gStr2Keycode.find(str);
     if (iter != gStr2Keycode.end())
         return iter->second;
@@ -245,7 +248,7 @@ std::optional<KeyCode> KeyCodeFromString(std::string_view str) {
         return {};
 }
 
-bool IsKeyCodeMouseButton(KeyCode key) {
+bool IsKeyCodeMouseButton(KeyCode key) noexcept {
     return key == VK_LBUTTON || key == VK_RBUTTON || key == VK_MBUTTON || key == VK_XBUTTON1 || key == VK_XBUTTON2;
 }
 

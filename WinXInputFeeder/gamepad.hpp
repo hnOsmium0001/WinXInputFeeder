@@ -15,8 +15,8 @@ struct ViGEm {
 
 	ViGEm(const ViGEm&) = delete;
 	ViGEm& operator=(const ViGEm&) = delete;
-	ViGEm(ViGEm&&);
-	ViGEm& operator=(ViGEm&&);
+	ViGEm(ViGEm&&) noexcept;
+	ViGEm& operator=(ViGEm&&) noexcept;
 };
 
 enum class XiButton : unsigned char {
@@ -50,8 +50,8 @@ struct X360Gamepad {
 
 	X360Gamepad(const X360Gamepad&) = delete;
 	X360Gamepad& operator=(const X360Gamepad&) = delete;
-	X360Gamepad(X360Gamepad&&);
-	X360Gamepad& operator=(X360Gamepad&&);
+	X360Gamepad(X360Gamepad&&) noexcept;
+	X360Gamepad& operator=(X360Gamepad&&) noexcept;
 
 	bool GetButton(XUSB_BUTTON) const noexcept;
 	void SetButton(XUSB_BUTTON, bool onoff) noexcept;
