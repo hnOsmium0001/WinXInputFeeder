@@ -9,18 +9,6 @@
 
 struct AppState;
 
-enum class XiButton : unsigned char {
-	None = 0,
-	A, B, X, Y,
-	LB, RB,
-	LT, RT,
-	Start, Back,
-	DpadUp, DpadDown, DpadLeft, DpadRight,
-	LStickBtn, RStickBtn,
-	LStickUp, LStickDown, LStickLeft, LStickRight,
-	RStickUp, RStickDown, RStickLeft, RStickRight,
-};
-
 // Information and lookup tables computable from a Config object
 // used for translating input key presses/mouse movements into gamepad state
 struct InputTranslationStruct {
@@ -98,6 +86,9 @@ struct AppState {
 	void OnPostLoadConfig();
 	void SetX360Profile(int gamepadId, Config::ProfileRef profile);
 	void StartRebindX360Device(int gamepadId);
+	void StartRebindX360Mapping(int gamepadId, XiButton btn);
+	// TODO set joystick options in mouse mode
+	void SetX360JoystickMode(int gamepadId, bool useRight /* false: left */, bool useMouse /* false: keyboard */);
 
 	void MainRenderFrame();
 

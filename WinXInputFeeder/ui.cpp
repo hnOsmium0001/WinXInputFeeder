@@ -110,6 +110,67 @@ void UIState::Show() {
 			}
 			ImGui::EndCombo();
 		}
+
+#define GAMEPAD_BTN_SIZED(NAME, VIGEM_ENUM, OUR_ENUM, BTN_SIZE) \
+	if (dev.GetButton(VIGEM_ENUM)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); \
+	if (ImGui::Button(NAME, BTN_SIZE)) s.StartRebindX360Mapping(userIndex, OUR_ENUM); \
+	if (dev.GetButton(VIGEM_ENUM)) ImGui::PopStyleColor()
+#define GAMEPAD_BTN(NAME, VIGEM_ENUM, OUR_ENUM) GAMEPAD_BTN_SIZED(NAME, VIGEM_ENUM, OUR_ENUM, ImVec2(60, 20))
+
+		if (ImGui::Button("LS Left", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickLeft);
+		ImGui::SameLine();
+		if (ImGui::Button("LS Right", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickRight);
+		ImGui::SameLine();
+		if (ImGui::Button("LS Up", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickUp);
+		ImGui::SameLine();
+		if (ImGui::Button("LS Down", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickDown);
+
+		if (ImGui::Button("RS Left", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickLeft);
+		ImGui::SameLine();
+		if (ImGui::Button("RS Right", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickRight);
+		ImGui::SameLine();
+		if (ImGui::Button("RS Up", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickUp);
+		ImGui::SameLine();
+		if (ImGui::Button("RS Down", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickDown);
+
+		GAMEPAD_BTN("L Thumb", XUSB_GAMEPAD_LEFT_THUMB, XiButton::LStickBtn);
+		ImGui::SameLine();
+		GAMEPAD_BTN("R Thumb", XUSB_GAMEPAD_RIGHT_THUMB, XiButton::RStickBtn);
+
+		GAMEPAD_BTN("DP Left", XUSB_GAMEPAD_DPAD_LEFT, XiButton::DpadLeft);
+		ImGui::SameLine();
+		GAMEPAD_BTN("DP Right", XUSB_GAMEPAD_DPAD_RIGHT, XiButton::DpadRight);
+		ImGui::SameLine();
+		GAMEPAD_BTN("DP Up", XUSB_GAMEPAD_DPAD_UP, XiButton::DpadUp);
+		ImGui::SameLine();
+		GAMEPAD_BTN("DP Down", XUSB_GAMEPAD_DPAD_DOWN, XiButton::DpadDown);
+
+		GAMEPAD_BTN("A", XUSB_GAMEPAD_A, XiButton::A);
+		ImGui::SameLine();
+		GAMEPAD_BTN("B", XUSB_GAMEPAD_B, XiButton::B);
+		ImGui::SameLine();
+		GAMEPAD_BTN("X", XUSB_GAMEPAD_X, XiButton::X);
+		ImGui::SameLine();
+		GAMEPAD_BTN("Y", XUSB_GAMEPAD_Y, XiButton::Y);
+
+		GAMEPAD_BTN("LB", XUSB_GAMEPAD_LEFT_SHOULDER, XiButton::LB);
+		ImGui::SameLine();
+		GAMEPAD_BTN("RB", XUSB_GAMEPAD_RIGHT_SHOULDER, XiButton::RB);
+
+		if (ImGui::Button("LT", ImVec2(60, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LT);
+		ImGui::SameLine();
+		ImGui::Text("%d", dev.state.bLeftTrigger);
+
+		if (ImGui::Button("RT", ImVec2(60, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RT);
+		ImGui::SameLine();
+		ImGui::Text("%d", dev.state.bRightTrigger);
+
+		GAMEPAD_BTN("Start", XUSB_GAMEPAD_START, XiButton::Start);
+		ImGui::SameLine();
+		GAMEPAD_BTN("Back", XUSB_GAMEPAD_BACK, XiButton::Back);
+
+#undef GAMEPAD_BTN
+#undef GAMEPAD_BTN_SIZED
 	}
 	else {
 		ImGui::Text("Select a gamepad to show details");

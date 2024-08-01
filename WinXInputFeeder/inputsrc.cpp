@@ -197,6 +197,45 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 			}
 		}
 
+		if (dev.pendingRebindBtn != XiButton::None) {
+			using enum XiButton;
+			switch (dev.pendingRebindBtn) {
+			case A: profile.a = vkey; its.btns[gamepadId][vkey] = A; break;
+			case B: profile.b = vkey; its.btns[gamepadId][vkey] = B; break;
+
+			case X: profile.x = vkey; its.btns[gamepadId][vkey] = X; break;
+			case Y: profile.y = vkey; its.btns[gamepadId][vkey] = Y; break;
+
+			case LB: profile.lb = vkey; its.btns[gamepadId][vkey] = LB; break;
+			case RB: profile.rb = vkey; its.btns[gamepadId][vkey] = RB; break;
+
+			case LT: profile.lt = vkey; its.btns[gamepadId][vkey] = LT; break;
+			case RT: profile.rt = vkey; its.btns[gamepadId][vkey] = RT; break;
+
+			case Start: profile.start = vkey; its.btns[gamepadId][vkey] = Start; break;
+			case Back: profile.back = vkey; its.btns[gamepadId][vkey] = Back; break;
+
+			case DpadUp: profile.dpadUp = vkey; its.btns[gamepadId][vkey] = DpadUp; break;
+			case DpadDown: profile.dpadDown = vkey; its.btns[gamepadId][vkey] = DpadDown; break;
+			case DpadLeft: profile.dpadLeft = vkey; its.btns[gamepadId][vkey] = DpadLeft; break;
+			case DpadRight: profile.dpadRight = vkey; its.btns[gamepadId][vkey] = DpadRight; break;
+
+			case LStickBtn: profile.lstickBtn = vkey; its.btns[gamepadId][vkey] = LStickBtn; break;
+			case RStickBtn: profile.rstickBtn = vkey; its.btns[gamepadId][vkey] = RStickBtn; break;
+
+			case LStickUp: profile.lstick.kbd.up = vkey; its.btns[gamepadId][vkey] = LStickUp; break;
+			case LStickDown: profile.lstick.kbd.down = vkey; its.btns[gamepadId][vkey] = LStickDown; break;
+			case LStickLeft: profile.lstick.kbd.left = vkey; its.btns[gamepadId][vkey] = LStickLeft; break;
+			case LStickRight: profile.lstick.kbd.right = vkey; its.btns[gamepadId][vkey] = LStickRight; break;
+
+			case RStickUp: profile.rstick.kbd.up = vkey; its.btns[gamepadId][vkey] = RStickUp; break;
+			case RStickDown: profile.rstick.kbd.down = vkey; its.btns[gamepadId][vkey] = RStickDown; break;
+			case RStickLeft: profile.rstick.kbd.left = vkey; its.btns[gamepadId][vkey] = RStickLeft; break;
+			case RStickRight: profile.rstick.kbd.right = vkey; its.btns[gamepadId][vkey] = RStickRight; break;
+			}
+			dev.pendingRebindBtn = None;
+		}
+
 		constexpr int kStickMaxVal = 32767;
 
 		switch (its.btns[gamepadId][vkey]) {
@@ -442,7 +481,10 @@ void MainWindow::ResizeRenderTarget(UINT width, UINT height) {
 }
 
 void AppState::ReloadConfig() {
+	x360s.clear();
+	its.ClearAll();
 	config = LoadConfig(toml::parse_file(fs::path(L"config.toml")));
+	OnPostLoadConfig();
 }
 
 void AppState::OnPostLoadConfig() {
@@ -464,9 +506,29 @@ void AppState::SetX360Profile(int gamepadId, Config::ProfileRef profile) {
 void AppState::StartRebindX360Device(int gamepadId) {
 	if (gamepadId < 0 || gamepadId >= x360s.size())
 		return;
-
 	auto& dev = x360s[gamepadId];
+
 	dev.pendingRebindDevice = true;
+}
+
+void AppState::StartRebindX360Mapping(int gamepadId, XiButton btn) {
+	if (gamepadId < 0 || gamepadId >= x360s.size())
+		return;
+	auto& profile = config.x360s[gamepadId]->second;
+	auto& dev = x360s[gamepadId];
+
+	dev.pendingRebindBtn = btn;
+}
+
+void AppState::SetX360JoystickMode(int gamepadId, bool useRight, bool useMouse) {
+	if (gamepadId < 0 || gamepadId >= x360s.size())
+		return;
+	auto& profile = config.x360s[gamepadId]->second;
+	auto& dev = x360s[gamepadId];
+
+	auto& stick = useRight ? profile.rstick : profile.lstick;
+	stick.useMouse = useMouse;
+	configDirty = true;
 }
 
 AppState::AppState(HINSTANCE hInstance)

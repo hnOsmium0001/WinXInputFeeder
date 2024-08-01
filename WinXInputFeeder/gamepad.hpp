@@ -19,6 +19,18 @@ struct ViGEm {
 	ViGEm& operator=(ViGEm&&);
 };
 
+enum class XiButton : unsigned char {
+	None = 0,
+	A, B, X, Y,
+	LB, RB,
+	LT, RT,
+	Start, Back,
+	DpadUp, DpadDown, DpadLeft, DpadRight,
+	LStickBtn, RStickBtn,
+	LStickUp, LStickDown, LStickLeft, LStickRight,
+	RStickUp, RStickDown, RStickLeft, RStickRight,
+};
+
 struct X360Gamepad {
 	PVIGEM_CLIENT hvigem;
 	PVIGEM_TARGET htarget;
@@ -30,6 +42,7 @@ struct X360Gamepad {
 
 	XUSB_REPORT state = {};
 
+	XiButton pendingRebindBtn = XiButton::None;
 	bool pendingRebindDevice = false;
 
 	X360Gamepad(const ViGEm& client);
@@ -40,7 +53,9 @@ struct X360Gamepad {
 	X360Gamepad(X360Gamepad&&);
 	X360Gamepad& operator=(X360Gamepad&&);
 
+	bool GetButton(XUSB_BUTTON) const noexcept;
 	void SetButton(XUSB_BUTTON, bool onoff) noexcept;
+
 	void SetLeftTrigger(BYTE val) noexcept { state.bLeftTrigger = val; }
 	void SetRightTrigger(BYTE val) noexcept { state.bRightTrigger = val; }
 	void SetStickLX(SHORT val) noexcept { state.sThumbLX = val; }

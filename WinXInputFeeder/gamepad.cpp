@@ -59,25 +59,16 @@ X360Gamepad& X360Gamepad::operator=(X360Gamepad&& that) {
 	return *this;
 }
 
+bool X360Gamepad::GetButton(XUSB_BUTTON btn) const noexcept {
+	// When an integral value is coerced into bool, all non-zero values are turned to 1 (and zero to 0)
+	return state.wButtons & btn;
+}
+
 void X360Gamepad::SetButton(XUSB_BUTTON btn, bool onoff) noexcept {
-	switch (btn) {
-#define CASE(e) case e: if (onoff) state.wButtons |= e; else state.wButtons &= ~e; break
-		CASE(XUSB_GAMEPAD_DPAD_UP);
-		CASE(XUSB_GAMEPAD_DPAD_DOWN);
-		CASE(XUSB_GAMEPAD_DPAD_LEFT);
-		CASE(XUSB_GAMEPAD_DPAD_RIGHT);
-		CASE(XUSB_GAMEPAD_START);
-		CASE(XUSB_GAMEPAD_BACK);
-		CASE(XUSB_GAMEPAD_LEFT_THUMB);
-		CASE(XUSB_GAMEPAD_RIGHT_THUMB);
-		CASE(XUSB_GAMEPAD_LEFT_SHOULDER);
-		CASE(XUSB_GAMEPAD_RIGHT_SHOULDER);
-		CASE(XUSB_GAMEPAD_GUIDE);
-		CASE(XUSB_GAMEPAD_A);
-		CASE(XUSB_GAMEPAD_B);
-		CASE(XUSB_GAMEPAD_X);
-		CASE(XUSB_GAMEPAD_Y);
-	}
+	if (onoff) 
+		state.wButtons |= btn;
+	else 
+		state.wButtons &= ~btn;
 }
 
 void X360Gamepad::SendReport() {

@@ -10,8 +10,85 @@
 
 using namespace std::literals;
 
-toml::table StringifyConfig(const Config& config)  noexcept {
-	return {}; // TODO
+static void WriteJoystick(toml::table& profile, const Joystick& js, const KeyCode& jsBtn) {
+	if (jsBtn != 0xFF) profile.emplace("Button", KeyCodeToString(jsBtn));
+
+	if (js.useMouse) {
+		profile.emplace("Type", "mouse"s);
+		profile.emplace("Sensitivity", js.mouse.sensitivity);
+		profile.emplace("NonLinearSensitivity", js.mouse.nonLinear);
+		profile.emplace("Deadzone", js.mouse.deadzone);
+		profile.emplace("InvertXAxis", js.mouse.invertXAxis);
+		profile.emplace("InvertYAxis", js.mouse.invertYAxis);
+	}
+	else {
+		profile.emplace("Type", "keyboard"s);
+		if (js.kbd.up != 0xFF) profile.emplace("Up", KeyCodeToString(js.kbd.up));
+		if (js.kbd.down != 0xFF) profile.emplace("Down", KeyCodeToString(js.kbd.down));
+		if (js.kbd.left != 0xFF) profile.emplace("Left", KeyCodeToString(js.kbd.left));
+		if (js.kbd.right != 0xFF) profile.emplace("Right", KeyCodeToString(js.kbd.right));
+		if (js.kbd.speed != 1.0f) profile.emplace("Speed", js.kbd.speed);
+	}
+}
+
+toml::table SaveConfig(const Config& config) noexcept {
+	toml::table res;
+
+	toml::table general;
+	general.emplace("MouseCheckFrequency", config.mouseCheckFrequency);
+	res.emplace("General", general);
+
+	toml::table hotkeys;
+	hotkeys.emplace("ShowUI", KeyCodeToString(config.hotkeyShowUI));
+	hotkeys.emplace("CaptureCursor", KeyCodeToString(config.hotkeyCaptureCursor));
+	res.emplace("HotKeys", hotkeys);
+
+	toml::table profiles;
+	for (auto&& [vName, vProfile] : config.profiles) {
+		toml::table profile;
+		if (vProfile.a != 0xFF) profile.emplace("A", KeyCodeToString(vProfile.a));
+		if (vProfile.b != 0xFF) profile.emplace("B", KeyCodeToString(vProfile.b));
+		if (vProfile.x != 0xFF) profile.emplace("X", KeyCodeToString(vProfile.x));
+		if (vProfile.y != 0xFF) profile.emplace("Y", KeyCodeToString(vProfile.y));
+		if (vProfile.lb != 0xFF) profile.emplace("LB", KeyCodeToString(vProfile.lb));
+		if (vProfile.rb != 0xFF) profile.emplace("RB", KeyCodeToString(vProfile.rb));
+		if (vProfile.lt != 0xFF) profile.emplace("LT", KeyCodeToString(vProfile.lt));
+		if (vProfile.rt != 0xFF) profile.emplace("RT", KeyCodeToString(vProfile.rt));
+		if (vProfile.start != 0xFF) profile.emplace("Start", KeyCodeToString(vProfile.start));
+		if (vProfile.back != 0xFF) profile.emplace("Back", KeyCodeToString(vProfile.back));
+		if (vProfile.dpadUp != 0xFF) profile.emplace("DpadUp", KeyCodeToString(vProfile.dpadUp));
+		if (vProfile.dpadDown != 0xFF) profile.emplace("DpadDown", KeyCodeToString(vProfile.dpadDown));
+		if (vProfile.dpadLeft != 0xFF) profile.emplace("DpadLeft", KeyCodeToString(vProfile.dpadLeft));
+		if (vProfile.dpadRight != 0xFF) profile.emplace("DpadRight", KeyCodeToString(vProfile.dpadRight));
+
+		toml::table lstick;
+		WriteJoystick(profile, vProfile.lstick, vProfile.rstickBtn);
+		profile.emplace("LStick", lstick);
+
+		toml::table rstick;
+		WriteJoystick(profile, vProfile.rstick, vProfile.lstickBtn);
+		profile.emplace("RStick", rstick);
+
+		profiles.emplace(vName, profile);
+	}
+	res.emplace("Profiles", profiles);
+
+	toml::array x360s;
+	x360s.reserve(config.x360Count);
+	for (int i = 0; i < config.x360Count; ++i) {
+		auto& vX360 = config.x360s[i];
+
+		toml::table x360;
+		x360.emplace("Profile", vX360->first);
+		x360s.push_back(x360);
+	}
+	res.emplace("X360", x360s);
+
+	toml::array dualshocks;
+	// TODO
+	res.emplace("DualShock", dualshocks);
+
+	return res;
 }
 
 static KeyCode ReadKeyCode(toml::node_view<const toml::node> t) {

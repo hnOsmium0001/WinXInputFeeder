@@ -82,5 +82,5 @@ struct Config {
 	KeyCode hotkeyCaptureCursor;
 };
 
-toml::table StringifyConfig(const Config&) noexcept;
+toml::table SaveConfig(const Config&) noexcept;
 Config LoadConfig(const toml::table&) noexcept;

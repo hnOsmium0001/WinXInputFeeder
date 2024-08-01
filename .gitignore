@@ -408,5 +408,5 @@ compile_commands.json
 # Personal scripts
 /.local/
 
-# ImGui application state files
-*.imgui-state
+imgui_state.ini
+config.toml

@@ -1,5 +1,7 @@
 #include "pch.hpp"
 
+#include "inputdevice.hpp"
+
 #include <memory>
 #include <shellapi.h>
 
@@ -8,6 +10,8 @@
 int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args);
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
+	InitKeyCodeConv();
+
 	int argCount;
 	PWSTR* argList = CommandLineToArgvW(pCmdLine, &argCount);
 	
