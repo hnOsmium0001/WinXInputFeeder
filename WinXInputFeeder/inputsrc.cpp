@@ -28,44 +28,37 @@ using namespace std::literals;
 constexpr UINT_PTR kMouseCheckTimerID = 0;
 
 void InputTranslationStruct::ClearAll() {
-	for (int userIndex = 0; userIndex < 4; ++userIndex) {
-		sticks[userIndex] = {};
+	for (int gamepadId = 0; gamepadId < 4; ++gamepadId) {
+		sticks[gamepadId] = {};
 		for (int i = 0; i < 0xFF; ++i) {
-			btns[userIndex][i] = XiButton::None;
+			btns[gamepadId][i] = X360Button::None;
 		}
 	}
 }
 
-void InputTranslationStruct::PopulateBtnLut(int userIndex, const UserProfile& profile) {
-	// Clear
-	for (auto& btn : btns[userIndex])
-		btn = XiButton::None;
+void InputTranslationStruct::PopulateBtnLut(int gamepadId, const UserProfile& profile) {
+	using enum X360Button;
 
-	using enum XiButton;
-#define BTN(KEY_ENUM, THE_BTN) if (THE_BTN != 0xFF) btns[userIndex][THE_BTN] = KEY_ENUM;
-	BTN(A, profile.a);
-	BTN(B, profile.b);
-	BTN(X, profile.x);
-	BTN(Y, profile.y);
-	BTN(LB, profile.lb);
-	BTN(RB, profile.rb);
-	BTN(LT, profile.lt);
-	BTN(RT, profile.rt);
-	BTN(Start, profile.start);
-	BTN(Back, profile.back);
-	BTN(DpadUp, profile.dpadUp);
-	BTN(DpadDown, profile.dpadDown);
-	BTN(DpadLeft, profile.dpadLeft);
-	BTN(DpadRight, profile.dpadRight);
-	BTN(LStickBtn, profile.lstickBtn);
-	BTN(RStickBtn, profile.rstickBtn);
-#define STICK(PREFIX, THE_STICK) \
-    if (THE_STICK.useMouse) {} \
-    else { BTN(PREFIX##StickUp, THE_STICK.kbd.up); BTN(PREFIX##StickDown, THE_STICK.kbd.down); BTN(PREFIX##StickLeft, THE_STICK.kbd.left); BTN(PREFIX##StickRight, THE_STICK.kbd.right); }
-	STICK(L, profile.lstick);
-	STICK(R, profile.rstick);
-#undef STICK
-#undef BTN
+	// Clear
+	for (auto& btn : btns[gamepadId])
+		btn = None;
+
+	for (unsigned char i = 0; i < kX360ButtonCount + 2 /* triggers */; ++i) {
+		auto boundKey = profile.buttons[i];
+		if (boundKey != 0xFF)
+			btns[gamepadId][boundKey] = static_cast<X360Button>(i);
+	}
+
+	auto DoStick = [&](unsigned char base, const Joystick& stick) {
+		if (stick.useMouse)
+			return;
+		for (unsigned char i = 0; i < 4; ++i) {
+			auto boundKey = profile.buttons[base + i];
+			if (boundKey != 0xFF)
+				btns[gamepadId][boundKey] = static_cast<X360Button>(base + i);
+		}};
+	DoStick(static_cast<unsigned char>(LStickUp), profile.lstick);
+	DoStick(static_cast<unsigned char>(RStickUp), profile.rstick);
 }
 
 static float Scale(float x, float lowerbound, float upperbound) {
@@ -174,10 +167,12 @@ static void SetJoystickPosition(float phi, float tilt, bool invertX, bool invert
 //}
 
 void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
+	using enum X360Button;
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
 		auto& profile = config.x360s[gamepadId]->second;
 
+		// Device filtering
 		if (IsKeyCodeMouseButton(vkey)) {
 			HANDLE src = dev.srcMouse;
 			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
@@ -197,76 +192,32 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 			}
 		}
 
-		if (dev.pendingRebindBtn != XiButton::None) {
-			using enum XiButton;
-			switch (dev.pendingRebindBtn) {
-			case A: profile.a = vkey; its.btns[gamepadId][vkey] = A; break;
-			case B: profile.b = vkey; its.btns[gamepadId][vkey] = B; break;
+		// Handle button rebinds
+		if (dev.pendingRebindBtn != None) {
+			profile.buttons[std::to_underlying(dev.pendingRebindBtn)] = vkey;
+			its.PopulateBtnLut(gamepadId, profile);
 
-			case X: profile.x = vkey; its.btns[gamepadId][vkey] = X; break;
-			case Y: profile.y = vkey; its.btns[gamepadId][vkey] = Y; break;
-
-			case LB: profile.lb = vkey; its.btns[gamepadId][vkey] = LB; break;
-			case RB: profile.rb = vkey; its.btns[gamepadId][vkey] = RB; break;
-
-			case LT: profile.lt = vkey; its.btns[gamepadId][vkey] = LT; break;
-			case RT: profile.rt = vkey; its.btns[gamepadId][vkey] = RT; break;
-
-			case Start: profile.start = vkey; its.btns[gamepadId][vkey] = Start; break;
-			case Back: profile.back = vkey; its.btns[gamepadId][vkey] = Back; break;
-
-			case DpadUp: profile.dpadUp = vkey; its.btns[gamepadId][vkey] = DpadUp; break;
-			case DpadDown: profile.dpadDown = vkey; its.btns[gamepadId][vkey] = DpadDown; break;
-			case DpadLeft: profile.dpadLeft = vkey; its.btns[gamepadId][vkey] = DpadLeft; break;
-			case DpadRight: profile.dpadRight = vkey; its.btns[gamepadId][vkey] = DpadRight; break;
-
-			case LStickBtn: profile.lstickBtn = vkey; its.btns[gamepadId][vkey] = LStickBtn; break;
-			case RStickBtn: profile.rstickBtn = vkey; its.btns[gamepadId][vkey] = RStickBtn; break;
-
-			case LStickUp: profile.lstick.kbd.up = vkey; its.btns[gamepadId][vkey] = LStickUp; break;
-			case LStickDown: profile.lstick.kbd.down = vkey; its.btns[gamepadId][vkey] = LStickDown; break;
-			case LStickLeft: profile.lstick.kbd.left = vkey; its.btns[gamepadId][vkey] = LStickLeft; break;
-			case LStickRight: profile.lstick.kbd.right = vkey; its.btns[gamepadId][vkey] = LStickRight; break;
-
-			case RStickUp: profile.rstick.kbd.up = vkey; its.btns[gamepadId][vkey] = RStickUp; break;
-			case RStickDown: profile.rstick.kbd.down = vkey; its.btns[gamepadId][vkey] = RStickDown; break;
-			case RStickLeft: profile.rstick.kbd.left = vkey; its.btns[gamepadId][vkey] = RStickLeft; break;
-			case RStickRight: profile.rstick.kbd.right = vkey; its.btns[gamepadId][vkey] = RStickRight; break;
-			}
 			dev.pendingRebindBtn = None;
 		}
 
 		constexpr int kStickMaxVal = 32767;
 
-		switch (its.btns[gamepadId][vkey]) {
-			using enum XiButton;
-		case A: dev.SetButton(XUSB_GAMEPAD_A, pressed); break;
-		case B: dev.SetButton(XUSB_GAMEPAD_B, pressed); break;
-		case X: dev.SetButton(XUSB_GAMEPAD_X, pressed); break;
-		case Y: dev.SetButton(XUSB_GAMEPAD_Y, pressed); break;
-
-		case LB: dev.SetButton(XUSB_GAMEPAD_LEFT_SHOULDER, pressed); break;
-		case RB: dev.SetButton(XUSB_GAMEPAD_RIGHT_SHOULDER, pressed); break;
-		case LT: dev.SetLeftTrigger(pressed ? 0xFF : 0x00); break;
-		case RT: dev.SetRightTrigger(pressed ? 0xFF : 0x00); break;
-
-		case Start: dev.SetButton(XUSB_GAMEPAD_START, pressed); break;
-		case Back: dev.SetButton(XUSB_GAMEPAD_BACK, pressed); break;
-
-		case DpadUp: dev.SetButton(XUSB_GAMEPAD_DPAD_UP, pressed); break;
-		case DpadDown: dev.SetButton(XUSB_GAMEPAD_DPAD_DOWN, pressed); break;
-		case DpadLeft: dev.SetButton(XUSB_GAMEPAD_DPAD_LEFT, pressed); break;
-		case DpadRight: dev.SetButton(XUSB_GAMEPAD_DPAD_RIGHT, pressed); break;
-
-		case LStickBtn: dev.SetButton(XUSB_GAMEPAD_LEFT_THUMB, pressed); break;
-		case RStickBtn: dev.SetButton(XUSB_GAMEPAD_RIGHT_THUMB, pressed); break;
+		X360Button btn = its.btns[gamepadId][vkey];
+		if (btn == None)
+			continue;
+		if (IsX360ButtonDirectMap(btn)) {
+			dev.SetButton(X360ButtonToViGEm(btn), pressed);
+		}
+		else switch (btn) {
+		case LeftTrigger: dev.SetLeftTrigger(pressed ? 0xFF : 0x00); break;
+		case RightTrigger:dev.SetRightTrigger(pressed ? 0xFF : 0x00); break;
 
 			// NOTE: we assume that if any key is setup for the joystick directions, it's on keyboard mode
 			//       that is, we rely on the translation struct being populated from the current user config correctly
 
 			// Stick's actual value per user's speed setting
 			// (in config it's specified as a fraction between 0 to 1
-#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * profile.lstick.kbd.speed)
+#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * profile.lstick.speed)
 			// TODO use the setters
 		case LStickUp: dev.state.sThumbLY += STICK_VALUE; break;
 		case LStickDown:dev.state.sThumbLY -= STICK_VALUE; break;
@@ -277,8 +228,6 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 		case RStickLeft: dev.state.sThumbRX -= STICK_VALUE; break;
 		case RStickRight: dev.state.sThumbRX += STICK_VALUE; break;
 #undef STICK_VALUE
-
-		case None: break;
 		}
 
 		dev.SendReport();
@@ -511,7 +460,7 @@ void AppState::StartRebindX360Device(int gamepadId) {
 	dev.pendingRebindDevice = true;
 }
 
-void AppState::StartRebindX360Mapping(int gamepadId, XiButton btn) {
+void AppState::StartRebindX360Mapping(int gamepadId, X360Button btn) {
 	if (gamepadId < 0 || gamepadId >= x360s.size())
 		return;
 	auto& profile = config.x360s[gamepadId]->second;

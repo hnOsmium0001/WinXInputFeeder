@@ -6,6 +6,8 @@
 
 #include "gamepad.hpp"
 
+using namespace std::literals;
+
 ViGEm::ViGEm()
 	: hvigem{ vigem_alloc() }
 {
@@ -29,6 +31,46 @@ ViGEm& ViGEm::operator=(ViGEm&& that) noexcept {
 	vigem_free(hvigem);
 	hvigem = std::exchange(that.hvigem, nullptr);
 	return *this;
+}
+
+X360Button X360ButtonFromViGEm(XUSB_BUTTON btn) noexcept {
+	unsigned long idx;
+	unsigned char res = _BitScanForward(&idx, btn);
+	return res == 0 ? static_cast<X360Button>(idx) : X360Button::None;
+}
+
+XUSB_BUTTON X360ButtonToViGEm(X360Button btn) noexcept {
+	assert(IsX360ButtonDirectMap(btn));
+	return static_cast<XUSB_BUTTON>(1 << std::to_underlying(btn));
+}
+
+constexpr std::string_view kX360ButtonStrings[] = {
+	// Direct mapping
+	"DPadUp"sv,
+	"DPadDown"sv,
+	"DPadLeft"sv,
+	"DPadRight"sv,
+	"Start"sv,
+	"Back"sv,
+	"LStick"sv,
+	"RStick"sv,
+	"LB"sv,
+	"RB"sv,
+	"Guide"sv,
+	"A"sv,
+	"B"sv,
+	"X"sv,
+	"Y"sv,
+
+	// Analog counterpart
+	"LT"sv,
+	"RT"sv,
+	"LStickUp"sv, "LStickDown"sv, "LStickLeft"sv, "LStickRight"sv,
+	"RStickUp"sv, "RStickDown"sv, "RStickLeft"sv, "RStickRight"sv,
+};
+
+std::string_view X360ButtonToString(X360Button btn) noexcept {
+	return kX360ButtonStrings[std::to_underlying(btn)];
 }
 
 X360Gamepad::X360Gamepad(const ViGEm& client)
@@ -65,9 +107,9 @@ bool X360Gamepad::GetButton(XUSB_BUTTON btn) const noexcept {
 }
 
 void X360Gamepad::SetButton(XUSB_BUTTON btn, bool onoff) noexcept {
-	if (onoff) 
+	if (onoff)
 		state.wButtons |= btn;
-	else 
+	else
 		state.wButtons &= ~btn;
 }
 

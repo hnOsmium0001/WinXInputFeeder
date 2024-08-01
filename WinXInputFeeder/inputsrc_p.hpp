@@ -19,7 +19,7 @@ struct InputTranslationStruct {
 
 	// VK_xxx is BYTE, max 255 values
 	// NOTE: XiButton::COUNT is used to indicate "this mapping is not bound"
-	XiButton btns[4][0xFF];
+	X360Button btns[4][0xFF];
 
 	InputTranslationStruct() {
 		ClearAll();
@@ -86,7 +86,7 @@ struct AppState {
 	void OnPostLoadConfig();
 	void SetX360Profile(int gamepadId, Config::ProfileRef profile);
 	void StartRebindX360Device(int gamepadId);
-	void StartRebindX360Mapping(int gamepadId, XiButton btn);
+	void StartRebindX360Mapping(int gamepadId, X360Button btn);
 	// TODO set joystick options in mouse mode
 	void SetX360JoystickMode(int gamepadId, bool useRight /* false: left */, bool useMouse /* false: keyboard */);
 

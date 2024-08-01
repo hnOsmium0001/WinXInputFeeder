@@ -14,11 +14,6 @@ using namespace std::literals;
 
 #define FORMAT_GAMEPAD_NAME(VAR, USER_INDEX ) char VAR[256]; snprintf(VAR, sizeof(VAR), "Gamepad %d", (int)USER_INDEX);
 
-struct HostWindow {
-	std::string nameUtf8;
-	HWND hwnd;
-};
-
 struct UIStatePrivate {
 	int selectedUserIndex = -1;
 	bool showDemoWindow = false;
@@ -34,6 +29,51 @@ UIState::UIState(AppState& app)
 
 UIState::~UIState() {
 	delete p;
+}
+
+static void ShowButton(AppState& app, X360Gamepad& gamepad, int gamepadId, X360Button btn, KeyCode boundKey) {
+	using enum X360Button;
+
+	const char* name = X360ButtonToString(btn).data();
+
+	if (IsX360ButtonDirectMap(btn)) {
+		bool pressed = gamepad.GetButton(X360ButtonToViGEm(btn));
+		if (pressed) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+		if (ImGui::Button(name, ImVec2(80, 20)))
+			app.StartRebindX360Mapping(gamepadId, btn);
+		if (pressed) ImGui::PopStyleColor();
+	}
+	else {
+		int value;
+		float f1, f2;
+		switch (btn) {
+		case LeftTrigger: value = gamepad.state.bLeftTrigger; goto eitherTrigger;
+		case RightTrigger: value = gamepad.state.bRightTrigger; goto eitherTrigger;
+		eitherTrigger:
+			if (ImGui::Button(name, ImVec2(80, 20)))
+				app.StartRebindX360Mapping(gamepadId, btn);
+			ImGui::SameLine();
+			ImGui::Text("%d", value);
+			break;
+
+		case LStickUp: f1 = gamepad.state.sThumbLX; f2 = gamepad.state.sThumbLY; goto eitherStick;
+		case RStickUp: f1 = gamepad.state.sThumbRX; f2 = gamepad.state.sThumbRY; goto eitherStick;
+		eitherStick:
+			ImGui::Text("%f", f1 / MAXSHORT);
+			ImGui::SameLine();
+			ImGui::Text("%f", f2 / MAXSHORT);
+			ImGui::SameLine();
+			if (ImGui::Button(name, ImVec2(80, 20)))
+				app.StartRebindX360Mapping(gamepadId, btn);
+			break;
+
+		default:
+			if (ImGui::Button(name, ImVec2(80, 20)))
+				app.StartRebindX360Mapping(gamepadId, btn);
+			break;
+		}
+
+	}
 }
 
 void UIState::Show() {
@@ -70,12 +110,12 @@ void UIState::Show() {
 
 	ImGui::Begin("Gamepad info");
 	if (p.selectedUserIndex != -1) {
-		auto userIndex = p.selectedUserIndex;
-		auto& dev = s.x360s[userIndex];
-		auto&& [profileName, profile] = *s.config.x360s[userIndex];
+		auto gamepadId = p.selectedUserIndex;
+		auto& dev = s.x360s[gamepadId];
+		auto&& [profileName, profile] = *s.config.x360s[gamepadId];
 
 		if (ImGui::Button("Rebind")) {
-			s.StartRebindX360Device(userIndex);
+			s.StartRebindX360Device(gamepadId);
 		}
 		if (dev.pendingRebindDevice) {
 			ImGui::SameLine();
@@ -83,7 +123,7 @@ void UIState::Show() {
 		}
 
 		if (ImGui::Button("Unbind##kdb")) {
-			s.x360s[userIndex].srcKbd = INVALID_HANDLE_VALUE;
+			s.x360s[gamepadId].srcKbd = INVALID_HANDLE_VALUE;
 		}
 		ImGui::SameLine();
 		if (dev.srcKbd == INVALID_HANDLE_VALUE)
@@ -92,7 +132,7 @@ void UIState::Show() {
 			ImGui::Text("Bound keyboard: %p", dev.srcKbd);
 
 		if (ImGui::Button("Unbind##mouse")) {
-			s.x360s[userIndex].srcMouse = INVALID_HANDLE_VALUE;
+			s.x360s[gamepadId].srcMouse = INVALID_HANDLE_VALUE;
 		}
 		ImGui::SameLine();
 		if (dev.srcMouse == INVALID_HANDLE_VALUE)
@@ -104,73 +144,64 @@ void UIState::Show() {
 			for (auto& p : s.config.profiles) {
 				bool selected = &p.second == &profile;
 				if (ImGui::MenuItem(p.first.c_str(), nullptr, selected)) {
-					LOG_DEBUG(L"UI: rebound gamepad {} to profile '{}'", userIndex, Utf8ToWide(profileName));
-					s.SetX360Profile(userIndex, &p);
+					LOG_DEBUG(L"UI: rebound gamepad {} to profile '{}'", gamepadId, Utf8ToWide(profileName));
+					s.SetX360Profile(gamepadId, &p);
 				}
 			}
 			ImGui::EndCombo();
 		}
 
-#define GAMEPAD_BTN_SIZED(NAME, VIGEM_ENUM, OUR_ENUM, BTN_SIZE) \
-	if (dev.GetButton(VIGEM_ENUM)) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f)); \
-	if (ImGui::Button(NAME, BTN_SIZE)) s.StartRebindX360Mapping(userIndex, OUR_ENUM); \
-	if (dev.GetButton(VIGEM_ENUM)) ImGui::PopStyleColor()
-#define GAMEPAD_BTN(NAME, VIGEM_ENUM, OUR_ENUM) GAMEPAD_BTN_SIZED(NAME, VIGEM_ENUM, OUR_ENUM, ImVec2(60, 20))
+		using enum X360Button;
+#define BUTTON(THE_BTN) ShowButton(s, dev, gamepadId, THE_BTN, profile.buttons[static_cast<unsigned char>(THE_BTN)])
+		BUTTON(LStickUp);
+		ImGui::SameLine();
+		BUTTON(LStickDown);
+		ImGui::SameLine();
+		BUTTON(LStickLeft);
+		ImGui::SameLine();
+		BUTTON(LStickRight);
 
-		if (ImGui::Button("LS Left", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickLeft);
+		BUTTON(RStickUp);
 		ImGui::SameLine();
-		if (ImGui::Button("LS Right", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickRight);
+		BUTTON(RStickDown);
 		ImGui::SameLine();
-		if (ImGui::Button("LS Up", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickUp);
+		BUTTON(RStickLeft);
 		ImGui::SameLine();
-		if (ImGui::Button("LS Down", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LStickDown);
+		BUTTON(RStickRight);
 
-		if (ImGui::Button("RS Left", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickLeft);
+		BUTTON(DPadUp);
 		ImGui::SameLine();
-		if (ImGui::Button("RS Right", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickRight);
+		BUTTON(DPadDown);
 		ImGui::SameLine();
-		if (ImGui::Button("RS Up", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickUp);
+		BUTTON(DPadLeft);
 		ImGui::SameLine();
-		if (ImGui::Button("RS Down", ImVec2(50, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RStickDown);
+		BUTTON(DPadRight);
 
-		GAMEPAD_BTN("L Thumb", XUSB_GAMEPAD_LEFT_THUMB, XiButton::LStickBtn);
+		BUTTON(Start);
 		ImGui::SameLine();
-		GAMEPAD_BTN("R Thumb", XUSB_GAMEPAD_RIGHT_THUMB, XiButton::RStickBtn);
+		BUTTON(Back);
 
-		GAMEPAD_BTN("DP Left", XUSB_GAMEPAD_DPAD_LEFT, XiButton::DpadLeft);
+		BUTTON(LeftThumb);
 		ImGui::SameLine();
-		GAMEPAD_BTN("DP Right", XUSB_GAMEPAD_DPAD_RIGHT, XiButton::DpadRight);
-		ImGui::SameLine();
-		GAMEPAD_BTN("DP Up", XUSB_GAMEPAD_DPAD_UP, XiButton::DpadUp);
-		ImGui::SameLine();
-		GAMEPAD_BTN("DP Down", XUSB_GAMEPAD_DPAD_DOWN, XiButton::DpadDown);
+		BUTTON(RightThumb);
 
-		GAMEPAD_BTN("A", XUSB_GAMEPAD_A, XiButton::A);
+		BUTTON(LeftShoulder);
 		ImGui::SameLine();
-		GAMEPAD_BTN("B", XUSB_GAMEPAD_B, XiButton::B);
-		ImGui::SameLine();
-		GAMEPAD_BTN("X", XUSB_GAMEPAD_X, XiButton::X);
-		ImGui::SameLine();
-		GAMEPAD_BTN("Y", XUSB_GAMEPAD_Y, XiButton::Y);
+		BUTTON(RightShoulder);
 
-		GAMEPAD_BTN("LB", XUSB_GAMEPAD_LEFT_SHOULDER, XiButton::LB);
-		ImGui::SameLine();
-		GAMEPAD_BTN("RB", XUSB_GAMEPAD_RIGHT_SHOULDER, XiButton::RB);
+		BUTTON(LeftTrigger);
+		BUTTON(RightTrigger);
 
-		if (ImGui::Button("LT", ImVec2(60, 20))) s.StartRebindX360Mapping(userIndex, XiButton::LT);
-		ImGui::SameLine();
-		ImGui::Text("%d", dev.state.bLeftTrigger);
+		BUTTON(Guide);
 
-		if (ImGui::Button("RT", ImVec2(60, 20))) s.StartRebindX360Mapping(userIndex, XiButton::RT);
+		BUTTON(A);
 		ImGui::SameLine();
-		ImGui::Text("%d", dev.state.bRightTrigger);
-
-		GAMEPAD_BTN("Start", XUSB_GAMEPAD_START, XiButton::Start);
+		BUTTON(B);
 		ImGui::SameLine();
-		GAMEPAD_BTN("Back", XUSB_GAMEPAD_BACK, XiButton::Back);
-
-#undef GAMEPAD_BTN
-#undef GAMEPAD_BTN_SIZED
+		BUTTON(X);
+		ImGui::SameLine();
+		BUTTON(Y);
+#undef BUTTON
 	}
 	else {
 		ImGui::Text("Select a gamepad to show details");
