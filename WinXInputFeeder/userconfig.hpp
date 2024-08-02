@@ -8,10 +8,11 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <span>
 #include <string_view>
 #include <toml++/toml.h>
 
-struct Joystick {
+struct ConfigJoystick {
 	/* Settings for keyboard mode */
 	float speed = 1.0f;
 
@@ -30,19 +31,32 @@ struct Joystick {
 	bool useMouse = false;
 };
 
-struct UserProfile {
+struct ConfigGamepad {
 	KeyCode buttons[kX360ButtonCount];
-	Joystick lstick, rstick;
+	ConfigJoystick lstick, rstick;
+
+	ConfigGamepad();
+};
+
+struct ConfigProfile {
+	std::vector<ConfigGamepad> gamepads;
+	unsigned char x360Count = 0; // Max 4
+
+	size_t GetX360Count() const { return x360Count; }
+	std::span<ConfigGamepad> GetX360s() { return std::span(gamepads.data(), x360Count); }
+	// Fail: if returned size_t is max value
+	std::pair<ConfigGamepad&, size_t> AddX360();
+
+	size_t GetDS4Count() const { return gamepads.size() - x360Count; }
+	std::span<ConfigGamepad> GetDS4s() { return std::span(gamepads.data() + x360Count, GetDS4Count()); }
+	std::pair<ConfigGamepad&, size_t> AddDS4();
 };
 
 struct Config {
-	using ProfileTable = std::map<std::string, UserProfile, std::less<>>;
+	using ProfileTable = std::map<std::string, ConfigProfile, std::less<>>;
 	using ProfileRef = ProfileTable::value_type*;
 
 	ProfileTable profiles;
-	ProfileRef x360s[4];
-	//std::vector<ProfileRef> dualshocks;
-	int x360Count = 0;
 	// Recommends 50-100
 	int mouseCheckFrequency = 75;
 	KeyCode hotkeyShowUI;

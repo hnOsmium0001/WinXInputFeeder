@@ -10,7 +10,27 @@
 
 using namespace std::literals;
 
-static void WriteJoystick(toml::table& profile, const Joystick& js) {
+ConfigGamepad::ConfigGamepad() {
+	memset(buttons, 0xFF, kX360ButtonCount * sizeof(KeyCode));
+}
+
+std::pair<ConfigGamepad&, size_t> ConfigProfile::AddX360() {
+	if (x360Count >= 4) {
+		// Return a dummy reference, the SIZE_MAX should already indicate failure
+		return { gamepads.front(), SIZE_MAX };
+	}
+
+	gamepads.insert(gamepads.begin() + x360Count, ConfigGamepad());
+	size_t idx = x360Count++;
+	return { gamepads[idx], idx };
+}
+
+std::pair<ConfigGamepad&, size_t> ConfigProfile::AddDS4() {
+	// TODO
+	return { gamepads.front(), 0 };
+}
+
+static void WriteJoystick(toml::table& profile, const ConfigJoystick& js) {
 	profile.emplace("Type", js.useMouse ? "mouse"s : "keyboard"s);
 	profile.emplace("Speed", js.speed);
 	profile.emplace("Sensitivity", js.sensitivity);
@@ -25,49 +45,44 @@ toml::table SaveConfig(const Config& vConfig) {
 
 	toml::table general;
 	general.emplace("MouseCheckFrequency", vConfig.mouseCheckFrequency);
-	res.emplace("General", general);
+	res.emplace("General", std::move(general));
 
 	toml::table hotkeys;
 	hotkeys.emplace("ShowUI", KeyCodeToString(vConfig.hotkeyShowUI));
 	hotkeys.emplace("CaptureCursor", KeyCodeToString(vConfig.hotkeyCaptureCursor));
-	res.emplace("HotKeys", hotkeys);
+	res.emplace("HotKeys", std::move(hotkeys));
 
 	toml::table profiles;
 	for (auto&& [vName, vProfile] : vConfig.profiles) {
 		toml::table profile;
 
-		for (int vBtn = 0; vBtn < kX360ButtonCount; ++vBtn) {
-			KeyCode vKey = vProfile.buttons[vBtn];
-			if (vBtn != 0xFF)
-				profile.emplace(X360ButtonToString(static_cast<X360Button>(vBtn)), KeyCodeToString(vKey));
+		profile.emplace("XboxCount", vProfile.x360Count);
+
+		toml::array gamepads;
+		for (auto& vGamepad : vProfile.gamepads) {
+			toml::table gamepad;
+
+			for (int vBtn = 0; vBtn < kX360ButtonCount; ++vBtn) {
+				KeyCode vKey = vGamepad.buttons[vBtn];
+				if (vBtn != 0xFF)
+					gamepad.emplace(X360ButtonToString(static_cast<X360Button>(vBtn)), KeyCodeToString(vKey));
+			}
+
+			toml::table lstick;
+			WriteJoystick(gamepad, vGamepad.lstick);
+			gamepad.emplace("LStick", std::move(lstick));
+
+			toml::table rstick;
+			WriteJoystick(gamepad, vGamepad.rstick);
+			gamepad.emplace("RStick", std::move(rstick));
+
+			gamepads.push_back(std::move(gamepad));
 		}
+		profile.emplace("Gamepads", std::move(gamepads));
 
-		toml::table lstick;
-		WriteJoystick(profile, vProfile.lstick);
-		profile.emplace("LStick", lstick);
-
-		toml::table rstick;
-		WriteJoystick(profile, vProfile.rstick);
-		profile.emplace("RStick", rstick);
-
-		profiles.emplace(vName, profile);
+		profiles.emplace(vName, std::move(profile));
 	}
-	res.emplace("Profiles", profiles);
-
-	toml::array x360s;
-	x360s.reserve(vConfig.x360Count);
-	for (int i = 0; i < vConfig.x360Count; ++i) {
-		auto& vX360 = vConfig.x360s[i];
-
-		toml::table x360;
-		x360.emplace("Profile", vX360->first);
-		x360s.push_back(x360);
-	}
-	res.emplace("X360", x360s);
-
-	toml::array dualshocks;
-	// TODO
-	res.emplace("DualShock", dualshocks);
+	res.emplace("Profiles", std::move(profiles));
 
 	return res;
 }
@@ -80,7 +95,7 @@ static KeyCode ReadKeyCode(toml::node_view<const toml::node> t) {
 		return 0xFF;
 }
 
-static void ReadJoystick(toml::node_view<const toml::node> t, Joystick& js) {
+static void ReadJoystick(toml::node_view<const toml::node> t, ConfigJoystick& js) {
 	if (const auto& v = t["Type"];
 		v == "keyboard")
 		js.useMouse = false;
@@ -105,55 +120,36 @@ Config LoadConfig(const toml::table& fConfig) {
 	config.hotkeyShowUI = ReadKeyCode(fHotkey["ShowUI"]);
 	config.hotkeyCaptureCursor = ReadKeyCode(fHotkey["CaptureCursor"]);
 
-	if (auto fProfiles = fConfig["UserProfiles"].as_table()) {
-		for (auto&& [key, val] : *fProfiles) {
+	auto fProfiles = fConfig["Profiles"].as_table();
+	if (fProfiles) for (auto&& [key, val] : *fProfiles) {
+		auto e1 = val.as_table();
+		if (!e1) continue;
+		auto& fProfile = *e1;
+		auto fName = key.str();
+
+		ConfigProfile profile;
+
+		profile.x360Count = fProfile["XboxCount"].value_or(0);
+
+		auto fGamepads = fProfile["Gamepads"].as_array();
+		if (fGamepads) for (auto& val : *fGamepads) {
 			auto e1 = val.as_table();
 			if (!e1) continue;
-			auto& fProfile = *e1;
-			auto fName = key.str();
+			auto& fGamepad = *e1;
 
-			UserProfile profile;
-			for (int fBtn = 0; fBtn < kX360ButtonCount; ++fBtn) {
-				KeyCode fKey = ReadKeyCode(fProfile[X360ButtonToString(static_cast<X360Button>(fBtn))]);
-				profile.buttons[fBtn] = fKey;
-			}
-			ReadJoystick(fProfile["LStick"], profile.lstick);
-			ReadJoystick(fProfile["RStick"], profile.rstick);
+			ConfigGamepad gamepad;
 
-			auto [DISCARD, success] = config.profiles.try_emplace(std::string(fName), std::move(profile));
-			if (!success) {
-				LOG_DEBUG(L"User profile '{}' already exists, cannot add", Utf8ToWide(fName));
+			for (unsigned char i = 0; i < kX360ButtonCount; ++i) {
+				gamepad.buttons[i] = ReadKeyCode(fGamepad[X360ButtonToString(static_cast<X360Button>(i))]);
 			}
+			ReadJoystick(fGamepad["LStick"], gamepad.lstick);
+			ReadJoystick(fGamepad["RStick"], gamepad.rstick);
+
+			profile.gamepads.push_back(std::move(gamepad));
 		}
+
+		config.profiles.try_emplace(std::string(fName), std::move(profile));
 	}
-
-	if (auto fX360binds = fConfig["X360"].as_array()) {
-		for (auto&& fEntry : *fX360binds) {
-			if (config.x360Count >= 4) {
-				LOG_DEBUG(L"Too many X360 gamepads, skipping the rest");
-				break;
-			}
-
-			auto fTableOpt = fEntry.as_table();
-			if (!fTableOpt) continue;
-			auto fTable = *fTableOpt;
-
-			auto fProfileNameOpt = fTable["Profile"].value<std::string_view>();
-			if (!fProfileNameOpt) continue;
-			auto fProfileName = *fProfileNameOpt;
-
-			auto iter = config.profiles.find(fProfileName);
-			if (iter == config.profiles.end()) {
-				LOG_DEBUG(L"Cannout find profile '{}' for binding X360 gamepads, skipping", Utf8ToWide(fProfileName));
-				continue;
-			}
-
-			config.x360s[config.x360Count++] = &*iter;
-		}
-	}
-
-	auto fDualshockBinds = fConfig["DualShock"];
-	// TODO
 
 	return config;
 }

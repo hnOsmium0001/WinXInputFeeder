@@ -26,7 +26,7 @@ struct InputTranslationStruct {
 	}
 
 	void ClearAll();
-	void PopulateBtnLut(int userIndex, const UserProfile& profile);
+	void PopulateBtnLut(int userIndex, const ConfigGamepad& gamepad);
 };
 
 // Wrap as struct for RAII helper
@@ -35,7 +35,7 @@ struct MainWindow {
 	HWND hWnd = nullptr;
 	ATOM hWc = 0;
 	/* 2-byte padding auto-added */
-	
+
 	// https://github.com/ocornut/imgui/blob/master/examples/example_win32_directx11/main.cpp
 	// For ImGui main viewport
 	ID3D11Device* d3dDevice = nullptr;
@@ -59,6 +59,7 @@ struct AppState {
 	HINSTANCE hInstance;
 
 	Config config;
+	Config::ProfileRef currentProfile = nullptr;
 	ViGEm vigem;
 	std::vector<X360Gamepad> x360s;
 	//std::vector<DualShockGamepad> dualshocks;
@@ -82,13 +83,21 @@ struct AppState {
 	~AppState();
 
 	// Functions to update the config & other states
+#pragma region Model
 	void ReloadConfig();
-	void OnPostLoadConfig();
-	void SetX360Profile(int gamepadId, Config::ProfileRef profile);
+
+	void SelectProfile(Config::ProfileRef profile);
+	bool AddProfile(std::string profileName);
+	void RemoveProfile(Config::ProfileRef profile);
+	
+	bool AddX360();
+	bool RemoveGamepad(int gamepadId);
+	
 	void StartRebindX360Device(int gamepadId);
 	void StartRebindX360Mapping(int gamepadId, X360Button btn);
 	// TODO set joystick options in mouse mode
 	void SetX360JoystickMode(int gamepadId, bool useRight /* false: left */, bool useMouse /* false: keyboard */);
+#pragma endregion
 
 	void MainRenderFrame();
 

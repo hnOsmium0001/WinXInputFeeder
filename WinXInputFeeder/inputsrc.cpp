@@ -36,7 +36,7 @@ void InputTranslationStruct::ClearAll() {
 	}
 }
 
-void InputTranslationStruct::PopulateBtnLut(int gamepadId, const UserProfile& profile) {
+void InputTranslationStruct::PopulateBtnLut(int gamepadId, const ConfigGamepad& gamepad) {
 	using enum X360Button;
 
 	// Clear
@@ -44,21 +44,21 @@ void InputTranslationStruct::PopulateBtnLut(int gamepadId, const UserProfile& pr
 		btn = None;
 
 	for (unsigned char i = 0; i < kX360ButtonCount + 2 /* triggers */; ++i) {
-		auto boundKey = profile.buttons[i];
+		auto boundKey = gamepad.buttons[i];
 		if (boundKey != 0xFF)
 			btns[gamepadId][boundKey] = static_cast<X360Button>(i);
 	}
 
-	auto DoStick = [&](unsigned char base, const Joystick& stick) {
+	auto DoStick = [&](unsigned char base, const ConfigJoystick& stick) {
 		if (stick.useMouse)
 			return;
 		for (unsigned char i = 0; i < 4; ++i) {
-			auto boundKey = profile.buttons[base + i];
+			auto boundKey = gamepad.buttons[base + i];
 			if (boundKey != 0xFF)
 				btns[gamepadId][boundKey] = static_cast<X360Button>(base + i);
 		}};
-	DoStick(static_cast<unsigned char>(LStickUp), profile.lstick);
-	DoStick(static_cast<unsigned char>(RStickUp), profile.rstick);
+	DoStick(static_cast<unsigned char>(LStickUp), gamepad.lstick);
+	DoStick(static_cast<unsigned char>(RStickUp), gamepad.rstick);
 }
 
 static float Scale(float x, float lowerbound, float upperbound) {
@@ -170,7 +170,7 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 	using enum X360Button;
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
-		auto& profile = config.x360s[gamepadId]->second;
+		auto& gamepad = currentProfile->second.gamepads[gamepadId];
 
 		// Device filtering
 		if (IsKeyCodeMouseButton(vkey)) {
@@ -194,8 +194,8 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 
 		// Handle button rebinds
 		if (dev.pendingRebindBtn != None) {
-			profile.buttons[std::to_underlying(dev.pendingRebindBtn)] = vkey;
-			its.PopulateBtnLut(gamepadId, profile);
+			gamepad.buttons[std::to_underlying(dev.pendingRebindBtn)] = vkey;
+			its.PopulateBtnLut(gamepadId, gamepad);
 
 			dev.pendingRebindBtn = None;
 		}
@@ -217,7 +217,7 @@ void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 
 			// Stick's actual value per user's speed setting
 			// (in config it's specified as a fraction between 0 to 1
-#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * profile.lstick.speed)
+#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * gamepad.lstick.speed)
 			// TODO use the setters
 		case LStickUp: dev.state.sThumbLY += STICK_VALUE; break;
 		case LStickDown:dev.state.sThumbLY -= STICK_VALUE; break;
@@ -430,26 +430,66 @@ void MainWindow::ResizeRenderTarget(UINT width, UINT height) {
 }
 
 void AppState::ReloadConfig() {
+	// Reset
 	x360s.clear();
 	its.ClearAll();
+	currentProfile = nullptr;
+
+	// Load
 	config = LoadConfig(toml::parse_file(fs::path(L"config.toml")));
-	OnPostLoadConfig();
+	if (!config.profiles.empty())
+		SelectProfile(&*config.profiles.begin());
 }
 
-void AppState::OnPostLoadConfig() {
-	x360s.reserve(config.x360Count);
-	for (int i = 0; i < config.x360Count; ++i) {
-		auto& x360Conf = config.x360s[i];
-		x360s.push_back(X360Gamepad(vigem));
-		auto& x360Inst = x360s.back();
+void AppState::SelectProfile(Config::ProfileRef profile) {
+	if (currentProfile == profile)
+		return;
 
-		its.PopulateBtnLut(i, x360Conf->second);
+	x360s.clear();
+	its.ClearAll();
+
+	currentProfile = profile;
+	if (profile) {
+		const ConfigProfile& p = profile->second;
+		size_t n = p.GetX360Count();
+
+		x360s.reserve(n);
+		for (int i = 0; i < n; ++i) {
+			x360s.push_back(X360Gamepad(vigem));
+			its.PopulateBtnLut(i, p.gamepads[i]);
+		}
 	}
 }
 
-void AppState::SetX360Profile(int gamepadId, Config::ProfileRef profile) {
+bool AppState::AddProfile(std::string profileName) {
+	auto [DISCARD, success] = config.profiles.try_emplace(std::move(profileName));
+	return success;
+}
+
+void AppState::RemoveProfile(Config::ProfileRef profile) {
+	config.profiles.erase(profile->first);
+	if (currentProfile == profile) {
+		if (!config.profiles.empty())
+			SelectProfile(&*config.profiles.begin());
+		else
+			SelectProfile(nullptr);
+	}
+}
+
+bool AppState::AddX360() {
+	auto&& [gamepad, gamepadId] = currentProfile->second.AddX360();
+	if (gamepadId == SIZE_MAX)
+		return false;
+
+	x360s.push_back(X360Gamepad(vigem));
+	auto& dev = x360s.back();
+
+	return true;
+}
+
+bool AppState::RemoveGamepad(int gamepadId) {
 	// TODO
-	configDirty = true;
+	return false;
 }
 
 void AppState::StartRebindX360Device(int gamepadId) {
@@ -463,7 +503,6 @@ void AppState::StartRebindX360Device(int gamepadId) {
 void AppState::StartRebindX360Mapping(int gamepadId, X360Button btn) {
 	if (gamepadId < 0 || gamepadId >= x360s.size())
 		return;
-	auto& profile = config.x360s[gamepadId]->second;
 	auto& dev = x360s[gamepadId];
 
 	dev.pendingRebindBtn = btn;
@@ -472,21 +511,20 @@ void AppState::StartRebindX360Mapping(int gamepadId, X360Button btn) {
 void AppState::SetX360JoystickMode(int gamepadId, bool useRight, bool useMouse) {
 	if (gamepadId < 0 || gamepadId >= x360s.size())
 		return;
-	auto& profile = config.x360s[gamepadId]->second;
+	auto& gamepad = currentProfile->second.gamepads[gamepadId];
 	auto& dev = x360s[gamepadId];
 
-	auto& stick = useRight ? profile.rstick : profile.lstick;
+	auto& stick = useRight ? gamepad.rstick : gamepad.lstick;
 	stick.useMouse = useMouse;
 	configDirty = true;
 }
 
 AppState::AppState(HINSTANCE hInstance)
 	: hInstance{ hInstance }
-	, config{ LoadConfig(toml::parse_file(fs::path(L"config.toml"))) }
 	, mainWindow(*this, hInstance)
 	, mainUI(*this)
 {
-	OnPostLoadConfig();
+	ReloadConfig();
 
 	constexpr UINT kNumRid = 2;
 	RAWINPUTDEVICE rid[kNumRid];

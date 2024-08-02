@@ -15,7 +15,7 @@ using namespace std::literals;
 #define FORMAT_GAMEPAD_NAME(VAR, USER_INDEX ) char VAR[256]; snprintf(VAR, sizeof(VAR), "Gamepad %d", (int)USER_INDEX);
 
 struct UIStatePrivate {
-	int selectedUserIndex = -1;
+	int selectedGamepadId = -1;
 	bool showDemoWindow = false;
 
 	UIStatePrivate(UIState& s)
@@ -99,20 +99,43 @@ void UIState::Show() {
 	}
 
 	ImGui::Begin("Gamepads");
+
+	if (ImGui::BeginCombo("Profile", s.currentProfile->first.c_str())) {
+		for (auto& it : s.config.profiles) {
+			auto&& [profileName, profile] = it;
+			bool selected = &it == s.currentProfile;
+			if (ImGui::MenuItem(profileName.c_str(), nullptr, &selected)) {
+				s.SelectProfile(&it);
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	if (ImGui::Button("+")) {
+		s.AddX360();
+	}
+	ImGui::SameLine();
+	if (p.selectedGamepadId == -1) ImGui::BeginDisabled();
+	if (ImGui::Button("-")) {
+		s.RemoveGamepad(p.selectedGamepadId);
+	}
+	if (p.selectedGamepadId == -1) ImGui::EndDisabled();
+
 	for (int gamepadId = 0; gamepadId < s.x360s.size(); ++gamepadId) {
 		FORMAT_GAMEPAD_NAME(id, gamepadId);
-		bool selected = p.selectedUserIndex == gamepadId;
+		bool selected = p.selectedGamepadId == gamepadId;
 		if (ImGui::Selectable(id, &selected)) {
-			p.selectedUserIndex = gamepadId;
+			p.selectedGamepadId = gamepadId;
 		}
 	}
 	ImGui::End();
 
 	ImGui::Begin("Gamepad info");
-	if (p.selectedUserIndex != -1) {
-		auto gamepadId = p.selectedUserIndex;
+	if (p.selectedGamepadId != -1) {
+		auto gamepadId = p.selectedGamepadId;
+		auto& currentProfile = s.currentProfile->second;
 		auto& dev = s.x360s[gamepadId];
-		auto&& [profileName, profile] = *s.config.x360s[gamepadId];
+		auto& profile= currentProfile.gamepads[gamepadId];
 
 		if (ImGui::Button("Rebind")) {
 			s.StartRebindX360Device(gamepadId);
@@ -139,17 +162,6 @@ void UIState::Show() {
 			ImGui::Text("Bound mouse: [any]");
 		else
 			ImGui::Text("Bound mouse: %p", dev.srcMouse);
-
-		if (ImGui::BeginCombo("Profile name", profileName.c_str())) {
-			for (auto& p : s.config.profiles) {
-				bool selected = &p.second == &profile;
-				if (ImGui::MenuItem(p.first.c_str(), nullptr, selected)) {
-					LOG_DEBUG(L"UI: rebound gamepad {} to profile '{}'", gamepadId, Utf8ToWide(profileName));
-					s.SetX360Profile(gamepadId, &p);
-				}
-			}
-			ImGui::EndCombo();
-		}
 
 		using enum X360Button;
 #define BUTTON(THE_BTN) ShowButton(s, dev, gamepadId, THE_BTN, profile.buttons[static_cast<unsigned char>(THE_BTN)])
