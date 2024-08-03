@@ -248,7 +248,8 @@ void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 			dev.pendingRebindBtn = None;
 		}
 
-		constexpr int kStickMaxVal = 32767;
+		// Bits in X360Gamepad::stickKeys corresponding to each button
+		enum { LUp, LDown, LLeft, LRight, RUp, RDown, RLeft, RRight };
 
 		X360Button btn = its.btns[gamepadId][vkey];
 		if (btn == None)
@@ -263,19 +264,29 @@ void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 			// NOTE: we assume that if any key is setup for the joystick directions, it's on keyboard mode
 			//       that is, we rely on the translation struct being populated from the current user config correctly
 
-			// Stick's actual value per user's speed setting
-			// (in config it's specified as a fraction between 0 to 1
-#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * gamepad.lstick.speed)
-			// TODO use the setters
-		case LStickUp: dev.state.sThumbLY += STICK_VALUE; break;
-		case LStickDown:dev.state.sThumbLY -= STICK_VALUE; break;
-		case LStickLeft: dev.state.sThumbLX -= STICK_VALUE; break;
-		case LStickRight: dev.state.sThumbLX += STICK_VALUE; break;
-		case RStickUp: dev.state.sThumbRY += STICK_VALUE; break;
-		case RStickDown:dev.state.sThumbRY -= STICK_VALUE; break;
-		case RStickLeft: dev.state.sThumbRX -= STICK_VALUE; break;
-		case RStickRight: dev.state.sThumbRX += STICK_VALUE; break;
-#undef STICK_VALUE
+#define SET_BIT(nth) SetUnsetBit(dev.stickKeys, nth, pressed)
+#define HAS_BIT(nth) (dev.stickKeys & (1 << nth))
+		case LStickUp: SET_BIT(LUp); goto lstick;
+		case LStickDown: SET_BIT(LDown); goto lstick;
+		case LStickLeft: SET_BIT(LLeft); goto lstick;
+		case LStickRight: SET_BIT(LRight); goto lstick;
+		lstick: {
+			auto val = static_cast<SHORT>(MAXSHORT * gamepad.lstick.speed);
+			dev.SetStickLX((HAS_BIT(LRight) ? val : 0) - (HAS_BIT(LLeft) ? val : 0));
+			dev.SetStickLY((HAS_BIT(LUp) ? val : 0) - (HAS_BIT(LDown) ? val : 0));
+		} break;
+
+		case RStickUp: SET_BIT(RUp); goto rstick;
+		case RStickDown: SET_BIT(RDown); goto rstick;
+		case RStickLeft: SET_BIT(RLeft); goto rstick;
+		case RStickRight: SET_BIT(RRight); goto rstick;
+		rstick: {
+			auto val = static_cast<SHORT>(MAXSHORT * gamepad.lstick.speed);
+			dev.SetStickRX((HAS_BIT(RRight) ? val : 0) - (HAS_BIT(RLeft) ? val : 0));
+			dev.SetStickRY((HAS_BIT(RUp) ? val : 0) - (HAS_BIT(RDown) ? val : 0));
+		} break;
+#undef HAS_BIT
+#undef SET_BIT
 		}
 
 		dev.SendReport();

@@ -36,6 +36,7 @@ struct X360Gamepad {
 	XUSB_REPORT state = {};
 
 	X360Button pendingRebindBtn = X360Button::None;
+	BYTE stickKeys = 0;
 	bool pendingRebindKbd = false;
 	bool pendingRebindMouse = false;
 

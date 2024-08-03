@@ -92,3 +92,11 @@ struct EventBus {
         callbacks.emplace_back(std::forward<T>(cb));
     }
 };
+
+template <typename T>
+void SetUnsetBit(T& t, int nth, bool b) {
+    if (b)
+        t |= 1 << nth;
+    else
+        t &= ~(1 << nth);
+}
