@@ -33,6 +33,7 @@ struct X360Gamepad {
 
 	float accuMouseX = 0.0f;
 	float accuMouseY = 0.0f;
+	float lastAngle = 0.0f;
 	XUSB_REPORT state = {};
 
 	X360Button pendingRebindBtn = X360Button::None;
@@ -78,8 +79,11 @@ struct InputTranslationStruct {
 
 class FeederEngine {
 private:
-	Config config;
 	ViGEm* vigem;
+	Config config;
+
+	HWND eventHwnd;
+	UINT_PTR mouseCheckTimer;
 
 	Config::ProfileRefMut currentProfile = nullptr;
 	std::vector<X360Gamepad> x360s;
@@ -89,7 +93,13 @@ private:
 	bool configDirty = false;
 
 public:
-	FeederEngine(Config config, ViGEm& vigem);
+	FeederEngine(HWND eventHwnd, Config config, ViGEm& vigem);
+	~FeederEngine();
+
+	FeederEngine(const FeederEngine&) = delete;
+	FeederEngine& operator=(const FeederEngine&) = delete;
+	FeederEngine(FeederEngine&&) = delete;
+	FeederEngine& operator=(FeederEngine&&) = delete;
 
 	const Config& GetConfig() const { return config; }
 

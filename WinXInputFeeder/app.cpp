@@ -41,20 +41,6 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		break;
 	}
 
-	case WM_TIMER: {
-		auto timerID = (UINT_PTR)wParam;
-
-		//switch (timerID) {
-		//case kMouseCheckTimerID: {
-		//	DoMouse2Joystick(its);
-		//	return 0;
-		//}
-
-		//default: break;
-		//}
-		break;
-	}
-
 	case WM_SIZE: {
 		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
@@ -240,16 +226,15 @@ static toml::table LoadConfigFile() {
 	return configFile;
 }
 
-static FeederEngine MakeFeederEngine(ViGEm& vigem) {
-	FeederEngine engine(Config(LoadConfigFile()), vigem);
-	return engine;
+static std::unique_ptr<FeederEngine> MakeFeederEngine(HWND eventHwnd, ViGEm& vigem) {
+	return std::make_unique<FeederEngine>(eventHwnd, Config(LoadConfigFile()), vigem);
 }
 
 App::App(HINSTANCE hInstance)
 	: hInstance{ hInstance }
 	, mainWindow(*this, hInstance)
 	, mainUI(*this)
-	, feeder(std::make_unique<FeederEngine>(MakeFeederEngine(vigem)))
+	, feeder(MakeFeederEngine(mainWindow.hWnd, vigem))
 {
 	mainUI.OnFeederEngine(feeder.get());
 
@@ -364,6 +349,9 @@ int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
 		// The blocking message pump
 		// We'll block here, until one of the messages changes changes blockingMessagePump to false (i.e. we should be rendering again) ...
 		while (s.shownWindowCount == 0 && GetMessageW(&msg, nullptr, 0, 0)) {
+			if (msg.message == WM_TIMER) {
+				msg.hwnd = s.mainWindow.hWnd;
+			}
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 			if (msg.message == WM_QUIT)
@@ -372,6 +360,9 @@ int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
 
 		// ... in which case the above loop breaks, and we come here (regular polling message pump) to process the rest, and then enter regular main loop doing rendering + polling
 		while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			if (msg.message == WM_TIMER) {
+				msg.hwnd = s.mainWindow.hWnd;
+			}
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 

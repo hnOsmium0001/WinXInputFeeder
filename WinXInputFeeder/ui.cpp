@@ -270,6 +270,11 @@ void UIStatePrivate::ShowDetailWindow() {
 		ImGui::Text("Bound mouse: %p", dev.srcMouse);
 	}
 
+	// DBG
+	ImGui::Text("accuMouseX: %f", dev.accuMouseX);
+	ImGui::Text("accuMouseY: %f", dev.accuMouseY);
+	ImGui::Text("lastAngle: %f", dev.lastAngle);
+
 	using enum X360Button;
 #define BUTTON(THE_BTN) ShowButton(dev, selectedGamepadId, THE_BTN, gamepad.buttons[static_cast<unsigned char>(THE_BTN)])
 	BUTTON(LStickUp);

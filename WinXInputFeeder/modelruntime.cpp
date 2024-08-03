@@ -110,12 +110,26 @@ void InputTranslationStruct::PopulateBtnLut(int gamepadId, const ConfigGamepad& 
 	DoStick(static_cast<unsigned char>(RStickUp), gamepad.rstick);
 }
 
-FeederEngine::FeederEngine(Config c, ViGEm& vigem)
+static void CALLBACK MouseCheckTimeProc(HWND hWnd, UINT message, UINT_PTR idTimer, DWORD dwTime) {
+	auto self = reinterpret_cast<FeederEngine*>(idTimer);
+	self->Update();
+}
+
+FeederEngine::FeederEngine(HWND eventHwnd, Config c, ViGEm& vigem)
 	: vigem{ &vigem }
 	, config{ std::move(c) }
+	, eventHwnd{ eventHwnd }
 {
 	if (!config.profiles.empty())
 		SelectProfile(&*config.profiles.begin());
+
+	mouseCheckTimer = SetTimer(eventHwnd, reinterpret_cast<UINT_PTR>(this), c.mouseCheckFrequency, MouseCheckTimeProc);
+	if (!mouseCheckTimer)
+		LOG_DEBUG(L"Failed to register mouse check timer");
+}
+
+FeederEngine::~FeederEngine() {
+	KillTimer(eventHwnd, mouseCheckTimer);
 }
 
 void FeederEngine::SelectProfile(Config::ProfileRef profileConst) {
@@ -297,57 +311,87 @@ static float Scale(float x, float lowerbound, float upperbound) {
 	return (x - lowerbound) / (upperbound - lowerbound);
 }
 
-/// \param phi phi ¡Ê [0,2¦Ð], defines in which direction the stick is tilted.
-/// \param tilt tilt ¡Ê (0,1], defines the amount of tilt. 0 is no tilt, 1 is full tilt.
-static void SetJoystickPosition(float phi, float tilt, bool invertX, bool invertY, short& outX, short& outY) {
-	constexpr float pi = 3.14159265358979323846f;
+constexpr float pi = 3.14159265358979323846f;
+
+/// \param phi phi âˆˆ [0,2Ï€], defines in which direction the stick is tilted.
+/// \param tilt tilt âˆˆ (0,1], defines the amount of tilt. 0 is no tilt, 1 is full tilt.
+static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool invertY, short& outX, short& outY) {
 	constexpr float kSnapToFullFilt = 0.005f;
 
 	tilt = std::clamp(tilt, 0.0f, 1.0f);
 	tilt = (1 - tilt) < kSnapToFullFilt ? 1 : tilt;
 
-	// [0,1]
-	float x, y;
+#define UNNORMALIZE(VAL) (VAL * 32767) 
 
-#define RANGE_FOR_X(LOWERBOUND, UPPERBOUND, FACTOR) if (phi >= LOWERBOUND && phi <= UPPERBOUND) { x = FACTOR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND); y = FACTOR * tilt; }
-#define RANGE_FOR_Y(LOWERBOUND, UPPERBOUND, FACTOR) if (phi >= LOWERBOUND && phi <= UPPERBOUND) { x = FACTOR * tilt; y = FACTOR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND); }
+#define STICK_MORE_VERTI(LOWERBOUND, UPPERBOUND, X_DIR, Y_DIR) \
+	if (phi >= LOWERBOUND && phi <= UPPERBOUND) { \
+		outX = UNNORMALIZE(X_DIR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND)); \
+		outY = UNNORMALIZE(Y_DIR * tilt); \
+		return; \
+	}
+#define STICK_MORE_HORIZ(LOWERBOUND, UPPERBOUND, X_DIR, Y_DIR) \
+	if (phi >= LOWERBOUND && phi <= UPPERBOUND) { \
+		outX = UNNORMALIZE(X_DIR * tilt); \
+		outY = UNNORMALIZE(Y_DIR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND)); \
+		return; \
+	}
+
+#define POS_X (invertX ? -1 : 1)
+#define NEG_X (invertX ? 1 : -1)
+#define POS_Y (invertY ? -1 : 1)
+#define NEG_Y (invertY ? 1 : -1)
+
 	// Two cases with forward+right
 	// Tilt is forward and slightly right
-	RANGE_FOR_X(3 * pi / 2, 7 * pi / 4, 1);
-	// Tilt is slightly forwardand right.
-	RANGE_FOR_Y(7 * pi / 4, 2 * pi, 1);
+	STICK_MORE_VERTI(3*pi/2, 7*pi/4, POS_X, POS_Y);
+	// Tilt is slightly forward and right.
+	STICK_MORE_HORIZ(7*pi/4, 2*pi, POS_X, POS_Y);
+
 	// Two cases with right+downward
 	// Tilt is right and slightly downward.
-	RANGE_FOR_Y(0, pi / 4, 1);
+	STICK_MORE_HORIZ(0, pi/4, POS_X, NEG_Y);
 	// Tilt is downward and slightly right.
-	RANGE_FOR_X(pi / 4, pi / 2, 1);
+	STICK_MORE_VERTI(pi/4, pi/2, POS_X, NEG_Y);
+
 	// Two cases with downward+left
 	// Tilt is downward and slightly left.
-	RANGE_FOR_X(pi / 2, 3 * pi / 4, -1);
+	STICK_MORE_VERTI(pi/2, 3*pi/4, NEG_X, NEG_Y);
 	// Tilt is left and slightly downward.
-	RANGE_FOR_X(3 * pi / 4, pi, -1);
+	STICK_MORE_VERTI(3*pi/4, pi, NEG_X, NEG_Y);
+
 	// Two cases with forward+left
 	// Tilt is left and slightly forward.
-	RANGE_FOR_Y(pi, 5 * pi / 4, -1);
+	STICK_MORE_HORIZ(pi, 5*pi/4, NEG_X, POS_Y);
 	// Tilt is forward and slightly left.
-	RANGE_FOR_X(5 * pi / 4, 3 * pi / 2, -1);
-#undef RANGE_FOR_X
-#undef RANGE_FOR_Y
+	STICK_MORE_VERTI(5*pi/4, 3*pi/2, NEG_X, POS_Y);
 
+	// If nothing matched, reset stick
+	outX = 0.0f;
+	outY = 0.0f;
+}
 
-	// Scale [0,1] to [INT16_MIN,INT16_MAX]
-	outX = static_cast<short>(x * 32768);
-	outY = static_cast<short>(y * 32768);
-
-	if (invertX) outX = -outX;
-	if (invertY) outY = -outY;
+// A variant of atan2() that spits out [0,2Ï€)
+static float Atan2Positive(float x, float y) {
+	if (x == 0.0f)
+		if (y > 0.0f)
+			return pi/2;
+		else
+			return 3*pi/2;
+	float phi = atan(y/x);
+	if (x < 0 && y > 0)
+		return phi + pi;
+	if (x < 0 && y <= 0)
+		return phi + pi;
+	if (x > 0 && y < 0)
+		return phi + 2*pi;
+	/* if (x > 0 && y >= 0) */
+	return phi;
 }
 
 void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
-		HANDLE src = dev.srcMouse;
-		if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
+		if (dev.srcMouse != hDevice) continue;
 
 		dev.accuMouseX += dx;
 		dev.accuMouseY += dy;
@@ -355,42 +399,51 @@ void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
 }
 
 void FeederEngine::Update() {
+	constexpr float kOuterRadius = 10.0f;
+	constexpr float kBounceBack = 0.0f;
+
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& gamepad = currentProfile->second.gamepads[gamepadId];
 		auto& dev = x360s[gamepadId];
 
-		constexpr float kOuterRadius = 10.0f;
-		constexpr float kBounceBack = 0.0f;
+		// Skip expensive calculations if both sticks don't use mouse2joystick
+		if (!gamepad.lstick.useMouse && !gamepad.rstick.useMouse)
+			continue;
 
 		float accuX = dev.accuMouseX;
 		float accuY = dev.accuMouseY;
+
 		// Distance of mouse from center
 		float r = sqrt(accuX * accuX + accuY * accuY);
 
 		// Clamp to a point on controller circle, if we are outside it
-		if (r > kOuterRadius) {
-			accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
-			accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
-			r = sqrt(accuX * accuX + accuY * accuY);
-		}
+		//if (r > kOuterRadius) {
+		//	accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
+		//	accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
+		//	r = sqrt(accuX * accuX + accuY * accuY);
+		//}
 
-		float phi = atan2(accuY, accuX);
+		float phi = Atan2Positive(accuY, accuX);
+		dev.lastAngle = phi; //DBG
 
 		auto forStick = [&](const ConfigJoystick& conf, short& outX, short& outY) {
-			if (r > conf.sensitivity * kOuterRadius) {
-				float num = r - conf.sensitivity * kOuterRadius;
-				float denom = kOuterRadius - conf.sensitivity * kOuterRadius;
-				SetJoystickPosition(phi, pow(num / denom, conf.nonLinear), conf.invertXAxis, conf.invertYAxis, outX, outY);
+			if (!conf.useMouse)
+				return;
+			if (r > conf.deadzone * kOuterRadius) {
+				float num = r - conf.deadzone * kOuterRadius;
+				float denom = kOuterRadius - conf.deadzone * kOuterRadius;
+				CalcJoystickPosition(phi, pow(num / denom, conf.nonLinear), conf.invertXAxis, conf.invertYAxis, outX, outY);
 			}
 			else {
 				outX = 0;
 				outY = 0;
-			}
-			};
+			}};
 		forStick(gamepad.lstick, dev.state.sThumbLX, dev.state.sThumbLY);
 		forStick(gamepad.rstick, dev.state.sThumbRX, dev.state.sThumbRY);
 
 		dev.accuMouseX = 0.0f;
 		dev.accuMouseY = 0.0f;
+
+		dev.SendReport();
 	}
 }
