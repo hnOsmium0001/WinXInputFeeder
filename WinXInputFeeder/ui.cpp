@@ -19,7 +19,6 @@ struct UIStatePrivate {
 	FeederEngine* feeder = nullptr;
 	std::string newProfileName;
 	int selectedGamepadId = -1;
-	bool showDemoWindow = false;
 
 	UIStatePrivate(UIState& s)
 		: pub{ &s }
@@ -67,10 +66,6 @@ void UIStatePrivate::Show() {
 			}
 			ImGui::EndMenu();
 		}
-		if (ImGui::BeginMenu("Tools")) {
-			ImGui::MenuItem("ImGui demo window", nullptr, &showDemoWindow);
-			ImGui::EndMenu();
-		}
 		ImGui::EndMainMenuBar();
 	}
 
@@ -81,10 +76,6 @@ void UIStatePrivate::Show() {
 	ImGui::Begin("Gamepad info");
 	ShowDetailWindow();
 	ImGui::End();
-
-	if (showDemoWindow) {
-		ImGui::ShowDemoWindow(&showDemoWindow);
-	}
 }
 
 void UIStatePrivate::ShowNavWindow() {
