@@ -99,13 +99,20 @@ void UIStatePrivate::ShowNavWindow() {
 	if (!pp) ImGui::BeginDisabled();
 	if (ImGui::Button("-profile")) {
 		feeder->RemoveProfile(pp);
+		selectedGamepadId = -1;
 	}
 	if (!pp) ImGui::EndDisabled();
 
 	if (ImGui::BeginPopup("Create Profile")) {
-		ImGui::InputText("Name", &newProfileName);
-		if (ImGui::Button("Confirm")) {
+		if (ImGui::IsWindowAppearing())
+			ImGui::SetKeyboardFocusHere();
+		bool entered = ImGui::InputText("Name", &newProfileName, ImGuiInputTextFlags_EnterReturnsTrue);
+
+		bool clicked = ImGui::Button("Confirm");
+		if (entered || clicked) {
 			feeder->AddProfile(newProfileName);
+			feeder->SelectProfile(&*config.profiles.begin());
+			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Cancel")) {
@@ -114,28 +121,33 @@ void UIStatePrivate::ShowNavWindow() {
 		ImGui::EndPopup();
 	}
 
-	if (!pp) {
-		if (ImGui::BeginCombo("Profile", "Create a profile")) {
+	if (config.profiles.empty()) {
+		if (ImGui::BeginCombo("Profile", "")) {
 			ImGui::MenuItem("Create a profile by clicking the +profile button above", nullptr, nullptr, false);
 			ImGui::EndCombo();
 		}
 		return;
 	}
+	else {
+		auto display = pp ? pp->first.c_str() : "";
+		if (ImGui::BeginCombo("Profile", display)) {
+			for (auto& it : config.profiles) {
+				auto&& [profileName, profile] = it;
+				bool selected = &it == pp;
+				if (ImGui::MenuItem(profileName.c_str(), nullptr, &selected)) {
+					feeder->SelectProfile(&it);
+				}
+			}
+			ImGui::EndCombo();
+		}
+	}
+
+	if (!pp)
+		return;
 
 	const std::string& profileName = pp->first;
 	const ConfigProfile& profile = pp->second;
 	auto x360s = feeder->GetX360s();
-
-	if (ImGui::BeginCombo("Profile", profileName.c_str())) {
-		for (auto& it : config.profiles) {
-			auto&& [profileName, profile] = it;
-			bool selected = &it == pp;
-			if (ImGui::MenuItem(profileName.c_str(), nullptr, &selected)) {
-				feeder->SelectProfile(&it);
-			}
-		}
-		ImGui::EndCombo();
-	}
 
 	if (ImGui::Button("+")) {
 		feeder->AddX360();

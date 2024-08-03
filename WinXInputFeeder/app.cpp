@@ -247,9 +247,9 @@ App::App(HINSTANCE hInstance)
 	: hInstance{ hInstance }
 	, mainWindow(*this, hInstance)
 	, mainUI(*this)
-	, feederEngine(std::make_unique<FeederEngine>(MakeFeederEngine(vigem)))
+	, feeder(std::make_unique<FeederEngine>(MakeFeederEngine(vigem)))
 {
-	mainUI.OnFeederEngine(feederEngine.get());
+	mainUI.OnFeederEngine(feeder.get());
 
 	constexpr UINT kNumRid = 2;
 	RAWINPUTDEVICE rid[kNumRid];
@@ -311,36 +311,29 @@ void App::MainRenderFrame() {
 
 LRESULT App::OnRawInput(RAWINPUT* ri) {
 	switch (ri->header.dwType) {
-		//case RIM_TYPEMOUSE: {
-		//	const auto& mouse = ri->data.mouse;
+		case RIM_TYPEMOUSE: {
+			const auto& mouse = ri->data.mouse;
 
-		//	// If any button is pressed...
-		//	if (mouse.usButtonFlags != 0) {
-		//		if (s.uiState->bindIdevFromNextMouse != -1) {
-		//			gXiGamepads[s.uiState->bindIdevFromNextMouse].srcMouse = ri->header.hDevice;
-		//			s.uiState->bindIdevFromNextMouse = -1;
-		//			break;
-		//		}
-		//	}
+			auto bf = mouse.usButtonFlags;
+			auto dev = ri->header.hDevice;
+			if (bf & RI_MOUSE_LEFT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_LBUTTON, true);
+			if (bf & RI_MOUSE_LEFT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_LBUTTON, false);
+			if (bf & RI_MOUSE_RIGHT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_RBUTTON, true);
+			if (bf & RI_MOUSE_RIGHT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_RBUTTON, false);
+			if (bf & RI_MOUSE_MIDDLE_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_MBUTTON, true);
+			if (bf & RI_MOUSE_MIDDLE_BUTTON_UP) feeder->HandleKeyPress(dev, VK_MBUTTON, false);
+			if (bf & RI_MOUSE_BUTTON_4_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON1, true);
+			if (bf & RI_MOUSE_BUTTON_4_UP) feeder->HandleKeyPress(dev, VK_XBUTTON1, false);
+			if (bf & RI_MOUSE_BUTTON_5_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON2, true);
+			if (bf & RI_MOUSE_BUTTON_5_UP) feeder->HandleKeyPress(dev, VK_XBUTTON2, false);
 
-		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_LBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_RBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP) HandleKeyPress(ri->header.hDevice, VK_MBUTTON, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON1, false, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, true, s.its);
-		//	if (mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) HandleKeyPress(ri->header.hDevice, VK_XBUTTON2, false, s.its);
+			if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
+				LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
+				break;
+			} // else: MOUSE_MOVE_RELATIVE
 
-		//	if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
-		//		LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
-		//		break;
-		//	} // else: MOUSE_MOVE_RELATIVE
-
-		//	HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY, s.its);
-		//} break;
+			feeder->HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY);
+		} break;
 
 	case RIM_TYPEKEYBOARD: {
 		const auto& kbd = ri->data.keyboard;
@@ -353,7 +346,7 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 			break;
 
 		bool press = !(kbd.Flags & RI_KEY_BREAK);
-		feederEngine->HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
+		feeder->HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
 	} break;
 	}
 

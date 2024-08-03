@@ -227,9 +227,9 @@ void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 			HANDLE src = dev.srcMouse;
 			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
 
-			if (dev.pendingRebindKbd) {
+			if (dev.pendingRebindMouse) {
 				dev.srcMouse = hDevice;
-				dev.pendingRebindKbd = false;
+				dev.pendingRebindMouse = false;
 			}
 		}
 		else {

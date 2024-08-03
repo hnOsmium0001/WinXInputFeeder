@@ -46,7 +46,7 @@ public:
 
 	ViGEm vigem;
 
-	std::unique_ptr<FeederEngine> feederEngine;
+	std::unique_ptr<FeederEngine> feeder;
 
 	// For a RAWINPUT*
 	// We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end
