@@ -1,14 +1,55 @@
 #include "pch.hpp"
 
-#include "userconfig.hpp"
+#include "modelconfig.hpp"
 
-#include "gamepad.hpp"
+#include "modelruntime.hpp"
 #include "utils.hpp"
 
 #include <algorithm>
 #include <fstream>
 
 using namespace std::literals;
+
+X360Button X360ButtonFromViGEm(XUSB_BUTTON btn) noexcept {
+	unsigned long idx;
+	unsigned char res = _BitScanForward(&idx, btn);
+	return res == 0 ? static_cast<X360Button>(idx) : X360Button::None;
+}
+
+XUSB_BUTTON X360ButtonToViGEm(X360Button btn) noexcept {
+	assert(IsX360ButtonDirectMap(btn));
+	return static_cast<XUSB_BUTTON>(1 << std::to_underlying(btn));
+}
+
+constexpr std::string_view kX360ButtonStrings[] = {
+	// Direct mapping
+	"DPadUp"sv,
+	"DPadDown"sv,
+	"DPadLeft"sv,
+	"DPadRight"sv,
+	"Start"sv,
+	"Back"sv,
+	"LStick"sv,
+	"RStick"sv,
+	"LB"sv,
+	"RB"sv,
+	"Guide"sv,
+	"DUMMY"sv,
+	"A"sv,
+	"B"sv,
+	"X"sv,
+	"Y"sv,
+
+	// Analog counterpart
+	"LT"sv,
+	"RT"sv,
+	"LStickUp"sv, "LStickDown"sv, "LStickLeft"sv, "LStickRight"sv,
+	"RStickUp"sv, "RStickDown"sv, "RStickLeft"sv, "RStickRight"sv,
+};
+
+std::string_view X360ButtonToString(X360Button btn) noexcept {
+	return kX360ButtonStrings[std::to_underlying(btn)];
+}
 
 ConfigGamepad::ConfigGamepad() {
 	memset(buttons, 0xFF, kX360ButtonCount * sizeof(KeyCode));

@@ -177,22 +177,22 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="userconfig.cpp" />
+    <ClCompile Include="modelconfig.cpp" />
     <ClCompile Include="inputdevice.cpp" />
     <ClCompile Include="inputsrc.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui.cpp" />
-    <ClCompile Include="gamepad.cpp" />
+    <ClCompile Include="modelruntime.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inputsrc_p.hpp" />
-    <ClInclude Include="userconfig.hpp" />
+    <ClInclude Include="modelconfig.hpp" />
     <ClInclude Include="inputdevice.hpp" />
     <ClInclude Include="inputsrc.hpp" />
     <ClInclude Include="pch.hpp" />
     <ClInclude Include="ui.hpp" />
-    <ClInclude Include="gamepad.hpp" />
+    <ClInclude Include="modelruntime.hpp" />
     <ClInclude Include="utils.hpp" />
   </ItemGroup>
   <ItemGroup>

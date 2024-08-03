@@ -20,6 +20,11 @@ GUID ParseRawInputDeviceGUID(std::wstring_view name);
 // For RIM_TYPExxx values
 std::wstring_view RawInputTypeToString(DWORD type);
 
+enum class IdevKind {
+    Keyboard,
+    Mouse,
+};
+
 struct IdevDevice {
     HANDLE hDevice = INVALID_HANDLE_VALUE;
     // TODO the GUID doesn't change for different devices at all, need a different way to identifying the device

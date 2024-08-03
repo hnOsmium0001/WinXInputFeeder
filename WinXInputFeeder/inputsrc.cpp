@@ -3,11 +3,11 @@
 #include "inputsrc.hpp"
 #include "inputsrc_p.hpp"
 
-#include "userconfig.hpp"
-#include "utils.hpp"
-#include "gamepad.hpp"
+#include "modelconfig.hpp"
+#include "modelruntime.hpp"
 #include "inputdevice.hpp"
 #include "ui.hpp"
+#include "utils.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -26,213 +26,6 @@ namespace fs = std::filesystem;
 using namespace std::literals;
 
 constexpr UINT_PTR kMouseCheckTimerID = 0;
-
-void InputTranslationStruct::ClearAll() {
-	for (int gamepadId = 0; gamepadId < 4; ++gamepadId) {
-		sticks[gamepadId] = {};
-		for (int i = 0; i < 0xFF; ++i) {
-			btns[gamepadId][i] = X360Button::None;
-		}
-	}
-}
-
-void InputTranslationStruct::PopulateBtnLut(int gamepadId, const ConfigGamepad& gamepad) {
-	using enum X360Button;
-
-	// Clear
-	for (auto& btn : btns[gamepadId])
-		btn = None;
-
-	for (unsigned char i = 0; i < kX360ButtonCount + 2 /* triggers */; ++i) {
-		auto boundKey = gamepad.buttons[i];
-		if (boundKey != 0xFF)
-			btns[gamepadId][boundKey] = static_cast<X360Button>(i);
-	}
-
-	auto DoStick = [&](unsigned char base, const ConfigJoystick& stick) {
-		if (stick.useMouse)
-			return;
-		for (unsigned char i = 0; i < 4; ++i) {
-			auto boundKey = gamepad.buttons[base + i];
-			if (boundKey != 0xFF)
-				btns[gamepadId][boundKey] = static_cast<X360Button>(base + i);
-		}};
-	DoStick(static_cast<unsigned char>(LStickUp), gamepad.lstick);
-	DoStick(static_cast<unsigned char>(RStickUp), gamepad.rstick);
-}
-
-static float Scale(float x, float lowerbound, float upperbound) {
-	return (x - lowerbound) / (upperbound - lowerbound);
-}
-
-/// \param phi phi ∈ [0,2π], defines in which direction the stick is tilted.
-/// \param tilt tilt ∈ (0,1], defines the amount of tilt. 0 is no tilt, 1 is full tilt.
-static void SetJoystickPosition(float phi, float tilt, bool invertX, bool invertY, short& outX, short& outY) {
-	constexpr float pi = 3.14159265358979323846f;
-	constexpr float kSnapToFullFilt = 0.005f;
-
-	tilt = std::clamp(tilt, 0.0f, 1.0f);
-	tilt = (1 - tilt) < kSnapToFullFilt ? 1 : tilt;
-
-	// [0,1]
-	float x, y;
-
-#define RANGE_FOR_X(LOWERBOUND, UPPERBOUND, FACTOR) if (phi >= LOWERBOUND && phi <= UPPERBOUND) { x = FACTOR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND); y = FACTOR * tilt; }
-#define RANGE_FOR_Y(LOWERBOUND, UPPERBOUND, FACTOR) if (phi >= LOWERBOUND && phi <= UPPERBOUND) { x = FACTOR * tilt; y = FACTOR * tilt * Scale(phi, LOWERBOUND, UPPERBOUND); }
-	// Two cases with forward+right
-	// Tilt is forward and slightly right
-	RANGE_FOR_X(3 * pi / 2, 7 * pi / 4, 1);
-	// Tilt is slightly forwardand right.
-	RANGE_FOR_Y(7 * pi / 4, 2 * pi, 1);
-	// Two cases with right+downward
-	// Tilt is right and slightly downward.
-	RANGE_FOR_Y(0, pi / 4, 1);
-	// Tilt is downward and slightly right.
-	RANGE_FOR_X(pi / 4, pi / 2, 1);
-	// Two cases with downward+left
-	// Tilt is downward and slightly left.
-	RANGE_FOR_X(pi / 2, 3 * pi / 4, -1);
-	// Tilt is left and slightly downward.
-	RANGE_FOR_X(3 * pi / 4, pi, -1);
-	// Two cases with forward+left
-	// Tilt is left and slightly forward.
-	RANGE_FOR_Y(pi, 5 * pi / 4, -1);
-	// Tilt is forward and slightly left.
-	RANGE_FOR_X(5 * pi / 4, 3 * pi / 2, -1);
-#undef RANGE_FOR_X
-#undef RANGE_FOR_Y
-
-
-	// Scale [0,1] to [INT16_MIN,INT16_MAX]
-	outX = static_cast<short>(x * 32768);
-	outY = static_cast<short>(y * 32768);
-
-	if (invertX) outX = -outX;
-	if (invertY) outY = -outY;
-}
-
-//static void DoMouse2Joystick(InputTranslationStruct& its) {
-//	for (int userIndex = 0; userIndex < 4; ++userIndex) {
-//		auto& profile = gXiGamepads[userIndex].profile;
-//		auto& dev = gXiGamepads[userIndex];
-//		auto& extra = its.sticks[userIndex];
-//
-//		constexpr float kOuterRadius = 10.0f;
-//		constexpr float kBounceBack = 0.0f;
-//
-//		float accuX = extra.accuMouseX;
-//		float accuY = extra.accuMouseY;
-//		// Distance of mouse from center
-//		float r = sqrt(accuX * accuX + accuY * accuY);
-//
-//		// Clamp to a point on controller circle, if we are outside it
-//		if (r > kOuterRadius) {
-//			accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
-//			accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
-//			r = sqrt(accuX * accuX + accuY * accuY);
-//		}
-//
-//		float phi = atan2(accuY, accuX);
-//
-//		auto forStick = [&](auto& conf, auto& ex, short& outX, short& outY) {
-//			if (r > conf.sensitivity * kOuterRadius) {
-//				float num = r - conf.sensitivity * kOuterRadius;
-//				float denom = kOuterRadius - conf.sensitivity * kOuterRadius;
-//				SetJoystickPosition(phi, pow(num / denom, conf.nonLinear), conf.invertXAxis, conf.invertYAxis, outX, outY);
-//			}
-//			else {
-//				dev.lstickX = 0;
-//				dev.lstickY = 0;
-//			}
-//			};
-//		forStick(profile->lstick.mouse, extra.lstick, dev.lstickX, dev.lstickY);
-//		forStick(profile->rstick.mouse, extra.rstick, dev.rstickX, dev.rstickY);
-//
-//		extra.accuMouseX = 0;
-//		extra.accuMouseY = 0;
-//	}
-//}
-//
-//static void HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy, InputTranslationStruct& its) {
-//	for (int userIndex = 0; userIndex < 4; ++userIndex) {
-//		if (!gXiGamepadsEnabled[userIndex]) continue;
-//		HANDLE src = gXiGamepads[userIndex].srcMouse;
-//		if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-//
-//		auto& extra = its.sticks[userIndex];
-//
-//		extra.accuMouseX += dx;
-//		extra.accuMouseY += dy;
-//	}
-//}
-
-void AppState::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
-	using enum X360Button;
-	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
-		auto& dev = x360s[gamepadId];
-		auto& gamepad = currentProfile->second.gamepads[gamepadId];
-
-		// Device filtering
-		if (IsKeyCodeMouseButton(vkey)) {
-			HANDLE src = dev.srcMouse;
-			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-
-			if (dev.pendingRebindDevice) {
-				dev.srcMouse = hDevice;
-				dev.pendingRebindDevice = false;
-			}
-		}
-		else {
-			HANDLE src = dev.srcKbd;
-			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-
-			if (dev.pendingRebindDevice) {
-				dev.srcKbd = hDevice;
-				dev.pendingRebindDevice = false;
-			}
-		}
-
-		// Handle button rebinds
-		if (dev.pendingRebindBtn != None) {
-			gamepad.buttons[std::to_underlying(dev.pendingRebindBtn)] = vkey;
-			its.PopulateBtnLut(gamepadId, gamepad);
-
-			dev.pendingRebindBtn = None;
-		}
-
-		constexpr int kStickMaxVal = 32767;
-
-		X360Button btn = its.btns[gamepadId][vkey];
-		if (btn == None)
-			continue;
-		if (IsX360ButtonDirectMap(btn)) {
-			dev.SetButton(X360ButtonToViGEm(btn), pressed);
-		}
-		else switch (btn) {
-		case LeftTrigger: dev.SetLeftTrigger(pressed ? 0xFF : 0x00); break;
-		case RightTrigger:dev.SetRightTrigger(pressed ? 0xFF : 0x00); break;
-
-			// NOTE: we assume that if any key is setup for the joystick directions, it's on keyboard mode
-			//       that is, we rely on the translation struct being populated from the current user config correctly
-
-			// Stick's actual value per user's speed setting
-			// (in config it's specified as a fraction between 0 to 1
-#define STICK_VALUE static_cast<SHORT>(kStickMaxVal * gamepad.lstick.speed)
-			// TODO use the setters
-		case LStickUp: dev.state.sThumbLY += STICK_VALUE; break;
-		case LStickDown:dev.state.sThumbLY -= STICK_VALUE; break;
-		case LStickLeft: dev.state.sThumbLX -= STICK_VALUE; break;
-		case LStickRight: dev.state.sThumbLX += STICK_VALUE; break;
-		case RStickUp: dev.state.sThumbRY += STICK_VALUE; break;
-		case RStickDown:dev.state.sThumbRY -= STICK_VALUE; break;
-		case RStickLeft: dev.state.sThumbRX -= STICK_VALUE; break;
-		case RStickRight: dev.state.sThumbRX += STICK_VALUE; break;
-#undef STICK_VALUE
-		}
-
-		dev.SendReport();
-	}
-}
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -429,102 +222,23 @@ void MainWindow::ResizeRenderTarget(UINT width, UINT height) {
 	CreateRenderTarget();
 }
 
-void AppState::ReloadConfig() {
-	// Reset
-	x360s.clear();
-	its.ClearAll();
-	currentProfile = nullptr;
-
-	// Load
-	config = LoadConfig(toml::parse_file(fs::path(L"config.toml")));
-	if (!config.profiles.empty())
-		SelectProfile(&*config.profiles.begin());
-}
-
-void AppState::SelectProfile(Config::ProfileRef profile) {
-	if (currentProfile == profile)
-		return;
-
-	x360s.clear();
-	its.ClearAll();
-
-	currentProfile = profile;
-	if (profile) {
-		const ConfigProfile& p = profile->second;
-		size_t n = p.GetX360Count();
-
-		x360s.reserve(n);
-		for (int i = 0; i < n; ++i) {
-			x360s.push_back(X360Gamepad(vigem));
-			its.PopulateBtnLut(i, p.gamepads[i]);
-		}
+static FeederEngine MakeFeederEngine(ViGEm& vigem) {
+	auto configFile = toml::parse_file(fs::path(L"config.toml"));
+	if (auto configAltPath = configFile["AltPath"].value<std::string>()) {
+		configFile = toml::parse_file(fs::path(*configAltPath));
 	}
-}
 
-bool AppState::AddProfile(std::string profileName) {
-	auto [DISCARD, success] = config.profiles.try_emplace(std::move(profileName));
-	return success;
-}
-
-void AppState::RemoveProfile(Config::ProfileRef profile) {
-	config.profiles.erase(profile->first);
-	if (currentProfile == profile) {
-		if (!config.profiles.empty())
-			SelectProfile(&*config.profiles.begin());
-		else
-			SelectProfile(nullptr);
-	}
-}
-
-bool AppState::AddX360() {
-	auto&& [gamepad, gamepadId] = currentProfile->second.AddX360();
-	if (gamepadId == SIZE_MAX)
-		return false;
-
-	x360s.push_back(X360Gamepad(vigem));
-	auto& dev = x360s.back();
-
-	return true;
-}
-
-bool AppState::RemoveGamepad(int gamepadId) {
-	// TODO
-	return false;
-}
-
-void AppState::StartRebindX360Device(int gamepadId) {
-	if (gamepadId < 0 || gamepadId >= x360s.size())
-		return;
-	auto& dev = x360s[gamepadId];
-
-	dev.pendingRebindDevice = true;
-}
-
-void AppState::StartRebindX360Mapping(int gamepadId, X360Button btn) {
-	if (gamepadId < 0 || gamepadId >= x360s.size())
-		return;
-	auto& dev = x360s[gamepadId];
-
-	dev.pendingRebindBtn = btn;
-}
-
-void AppState::SetX360JoystickMode(int gamepadId, bool useRight, bool useMouse) {
-	if (gamepadId < 0 || gamepadId >= x360s.size())
-		return;
-	auto& gamepad = currentProfile->second.gamepads[gamepadId];
-	auto& dev = x360s[gamepadId];
-
-	auto& stick = useRight ? gamepad.rstick : gamepad.lstick;
-	stick.useMouse = useMouse;
-	configDirty = true;
+	FeederEngine engine(LoadConfig(configFile), vigem);
+	return engine;
 }
 
 AppState::AppState(HINSTANCE hInstance)
 	: hInstance{ hInstance }
 	, mainWindow(*this, hInstance)
 	, mainUI(*this)
+	, feederEngine(std::make_unique<FeederEngine>(MakeFeederEngine(vigem)))
 {
-	ReloadConfig();
+	mainUI.OnFeederEngine(feederEngine.get());
 
 	constexpr UINT kNumRid = 2;
 	RAWINPUTDEVICE rid[kNumRid];
@@ -628,7 +342,7 @@ LRESULT AppState::OnRawInput(RAWINPUT* ri) {
 			break;
 
 		bool press = !(kbd.Flags & RI_KEY_BREAK);
-		HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
+		feederEngine->HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
 	} break;
 	}
 
