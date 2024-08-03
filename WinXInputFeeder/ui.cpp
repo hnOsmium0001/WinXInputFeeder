@@ -12,7 +12,30 @@
 
 using namespace std::literals;
 
-#define FORMAT_GAMEPAD_NAME(VAR, USER_INDEX) char VAR[256]; snprintf(VAR, sizeof(VAR), "Gamepad %d", (int)USER_INDEX);
+// Helper to display a little (?) mark which shows a tooltip when hovered.
+// In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
+static void HelpMarker(const char* desc) {
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	if (ImGui::BeginItemTooltip()) {
+		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+		ImGui::TextUnformatted(desc);
+		ImGui::PopTextWrapPos();
+		ImGui::EndTooltip();
+	}
+}
+
+static bool ButtonDisablable(const char* msg, bool disabled) {
+	if (disabled) {
+		ImGui::BeginDisabled();
+		bool res = ImGui::Button(msg);
+		ImGui::EndDisabled();
+		return res;
+	}
+	else {
+		return ImGui::Button(msg);
+	}
+}
 
 struct UIStatePrivate {
 	UIState* pub;
@@ -83,26 +106,58 @@ void UIStatePrivate::ShowNavWindow() {
 
 	auto pp = feeder->GetCurrentProfile();
 	if (ImGui::Button("+profile")) {
-		newProfileName.clear();
+		// Search for a new usable dummy name
+		char buf[256];
+		int size;
+		int n = 1;
+		while (true) {
+			int written = snprintf(buf, sizeof(buf), "Profile %d", n);
+			if (written > sizeof(buf) || n == INT_MAX) {
+				size = sizeof(buf) - 1;
+				break; // Bail
+			}
+			auto iter = config.profiles.find(std::string_view(buf, written));
+			if (iter == config.profiles.end()) {
+				size = written;
+				break;
+			}
+			++n;
+		} 
+		newProfileName.assign(buf, size);
 		ImGui::OpenPopup("Create Profile");
 	}
 	ImGui::SameLine();
-	if (!pp) ImGui::BeginDisabled();
-	if (ImGui::Button("-profile")) {
-		feeder->RemoveProfile(pp);
-		selectedGamepadId = -1;
+	if (ButtonDisablable("-profile", !pp)) {
+		ImGui::OpenPopup("Confirm Remove Profile");
 	}
-	if (!pp) ImGui::EndDisabled();
 
 	if (ImGui::BeginPopup("Create Profile")) {
-		if (ImGui::IsWindowAppearing())
-			ImGui::SetKeyboardFocusHere();
-		bool entered = ImGui::InputText("Name", &newProfileName, ImGuiInputTextFlags_EnterReturnsTrue);
+		bool invalid = newProfileName.empty();
 
-		bool clicked = ImGui::Button("Confirm");
-		if (entered || clicked) {
+		if (ImGui::IsWindowAppearing())
+			ImGui::SetKeyboardFocusHere(); // On InputText
+		if ((ImGui::InputText("Name", &newProfileName, ImGuiInputTextFlags_EnterReturnsTrue) && !invalid) ||
+			ButtonDisablable("Confirm", invalid))
+		{
 			feeder->AddProfile(newProfileName);
-			feeder->SelectProfile(&*config.profiles.begin());
+			feeder->SelectProfile(&*config.profiles.find(newProfileName));
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel")) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	bool dummy = true;
+	// We have to pass p_opened to make ImGui show a close button
+	if (ImGui::BeginPopupModal("Confirm Remove Profile", &dummy, ImGuiWindowFlags_NoResize)) {
+		ImGui::TextUnformatted("Are you sure you want to remove this profile?");
+		if (ImGui::Button("Confirm")) {
+			feeder->RemoveProfile(pp);
+			selectedGamepadId = -1;
+			pp = nullptr;
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
@@ -144,14 +199,13 @@ void UIStatePrivate::ShowNavWindow() {
 		feeder->AddX360();
 	}
 	ImGui::SameLine();
-	if (selectedGamepadId == -1) ImGui::BeginDisabled();
-	if (ImGui::Button("-")) {
+	if (ButtonDisablable("-", selectedGamepadId == -1)) {
 		feeder->RemoveGamepad(selectedGamepadId);
 	}
-	if (selectedGamepadId == -1) ImGui::EndDisabled();
 
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
-		FORMAT_GAMEPAD_NAME(id, gamepadId);
+		char id[256];
+		snprintf(id, sizeof(id), "Gamepad %d", gamepadId);
 		bool selected = selectedGamepadId == gamepadId;
 		if (ImGui::Selectable(id, &selected)) {
 			selectedGamepadId = gamepadId;
@@ -189,7 +243,8 @@ void UIStatePrivate::ShowDetailWindow() {
 		ImGui::Text("press any key on the keyboard");
 	}
 	else if (dev.srcKbd == INVALID_HANDLE_VALUE) {
-		ImGui::Text("Bound keyboard: [any]");
+		ImGui::Text("Bound keyboard: [not bound]");
+		HelpMarker("This means no key press will trigger any bound buttons, effectively disabling this gamepad from key inputs.");
 	}
 	else {
 		ImGui::Text("Bound keyboard: %p", dev.srcKbd);
@@ -208,7 +263,8 @@ void UIStatePrivate::ShowDetailWindow() {
 		ImGui::Text("press any mouse button");
 	}
 	else if (dev.srcMouse == INVALID_HANDLE_VALUE) {
-		ImGui::Text("Bound mouse: [any]");
+		ImGui::Text("Bound mouse: [not bound]");
+		HelpMarker("This means no mouse button or movement will trigger any bound buttons, effectively disabling this gamepad from mouse inputs.");
 	}
 	else {
 		ImGui::Text("Bound mouse: %p", dev.srcMouse);

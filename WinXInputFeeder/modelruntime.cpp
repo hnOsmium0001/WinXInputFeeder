@@ -224,22 +224,20 @@ void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 
 		// Device filtering
 		if (IsKeyCodeMouseButton(vkey)) {
-			HANDLE src = dev.srcMouse;
-			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-
 			if (dev.pendingRebindMouse) {
 				dev.srcMouse = hDevice;
 				dev.pendingRebindMouse = false;
 			}
+
+			if (dev.srcMouse != hDevice) continue;
 		}
 		else {
-			HANDLE src = dev.srcKbd;
-			if (src != INVALID_HANDLE_VALUE && src != hDevice) continue;
-
 			if (dev.pendingRebindKbd) {
 				dev.srcKbd = hDevice;
 				dev.pendingRebindKbd = false;
 			}
+
+			if (dev.srcKbd != hDevice) continue;
 		}
 
 		// Handle button rebinds
