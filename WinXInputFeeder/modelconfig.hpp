@@ -123,9 +123,11 @@ struct Config {
 	ProfileTable profiles;
 	// Recommends 50-100
 	int mouseCheckFrequency = 75;
-	KeyCode hotkeyShowUI;
-	KeyCode hotkeyCaptureCursor;
-};
+	KeyCode hotkeyShowUI = 0xFF;
+	KeyCode hotkeyCaptureCursor = 0xFF;
 
-toml::table SaveConfig(const Config&);
-Config LoadConfig(const toml::table&);
+	Config();
+	Config(const toml::table&);
+
+	toml::table ExportAsToml() const;
+};

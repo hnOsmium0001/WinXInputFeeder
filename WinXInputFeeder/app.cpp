@@ -222,13 +222,24 @@ void MainWindow::ResizeRenderTarget(UINT width, UINT height) {
 	CreateRenderTarget();
 }
 
-static FeederEngine MakeFeederEngine(ViGEm& vigem) {
-	auto configFile = toml::parse_file(fs::path(L"config.toml"));
-	if (auto configAltPath = configFile["AltPath"].value<std::string>()) {
-		configFile = toml::parse_file(fs::path(*configAltPath));
+static toml::table LoadConfigFile() {
+	toml::table configFile;
+	try {
+		configFile = toml::parse_file(fs::path(L"config.toml"));
+	}
+	catch (const toml::parse_error& err) {
+		return toml::table();
 	}
 
-	FeederEngine engine(LoadConfig(configFile), vigem);
+	if (auto configAltPath = configFile["AltPath"].value<std::string>()) {
+		// If parse error, let it propagate out
+		return toml::parse_file(fs::path(*configAltPath));
+	}
+	return configFile;
+}
+
+static FeederEngine MakeFeederEngine(ViGEm& vigem) {
+	FeederEngine engine(Config(LoadConfigFile()), vigem);
 	return engine;
 }
 

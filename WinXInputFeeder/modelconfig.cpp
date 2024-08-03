@@ -81,20 +81,85 @@ static void WriteJoystick(toml::table& profile, const ConfigJoystick& js) {
 	profile.emplace("InvertYAxis", js.invertYAxis);
 }
 
-toml::table SaveConfig(const Config& vConfig) {
+static KeyCode ReadKeyCode(toml::node_view<const toml::node> t) {
+	auto str = t.value<std::string_view>();
+	if (str)
+		return KeyCodeFromString(str.value()).value_or(0xFF);
+	else
+		return 0xFF;
+}
+
+static void ReadJoystick(toml::node_view<const toml::node> t, ConfigJoystick& js) {
+	if (const auto& v = t["Type"];
+		v == "keyboard")
+		js.useMouse = false;
+	else if (v == "mouse")
+		js.useMouse = true;
+
+	js.speed = std::clamp(t["Speed"].value_or<float>(1.0f), 0.0f, 1.0f);
+	js.sensitivity = t["Sensitivity"].value_or<float>(50.0f);
+	js.nonLinear = t["NonLinearSensitivity"].value_or<float>(0.8f);
+	js.deadzone = t["Deadzone"].value_or<float>(0.02f);
+	js.invertXAxis = t["InvertXAxis"].value_or<bool>(false);
+	js.invertYAxis = t["InvertYAxis"].value_or<bool>(false);
+}
+
+Config::Config() {}
+
+Config::Config(const toml::table& fConfig) {
+	auto fGeneral = fConfig["General"];
+	this->mouseCheckFrequency = fGeneral["MouseCheckFrequency"].value_or<int>(75);
+
+	auto fHotkey = fConfig["HotKeys"];
+	this->hotkeyShowUI = ReadKeyCode(fHotkey["ShowUI"]);
+	this->hotkeyCaptureCursor = ReadKeyCode(fHotkey["CaptureCursor"]);
+
+	auto fProfiles = fConfig["Profiles"].as_table();
+	if (fProfiles) for (auto&& [key, val] : *fProfiles) {
+		auto e1 = val.as_table();
+		if (!e1) continue;
+		auto& fProfile = *e1;
+		auto fName = key.str();
+
+		ConfigProfile profile;
+
+		profile.x360Count = fProfile["XboxCount"].value_or(0);
+
+		auto fGamepads = fProfile["Gamepads"].as_array();
+		if (fGamepads) for (auto& val : *fGamepads) {
+			auto e1 = val.as_table();
+			if (!e1) continue;
+			auto& fGamepad = *e1;
+
+			ConfigGamepad gamepad;
+
+			for (unsigned char i = 0; i < kX360ButtonCount; ++i) {
+				gamepad.buttons[i] = ReadKeyCode(fGamepad[X360ButtonToString(static_cast<X360Button>(i))]);
+			}
+			ReadJoystick(fGamepad["LStick"], gamepad.lstick);
+			ReadJoystick(fGamepad["RStick"], gamepad.rstick);
+
+			profile.gamepads.push_back(std::move(gamepad));
+		}
+
+		this->profiles.try_emplace(std::string(fName), std::move(profile));
+	}
+}
+
+toml::table Config::ExportAsToml() const {
 	toml::table res;
 
 	toml::table general;
-	general.emplace("MouseCheckFrequency", vConfig.mouseCheckFrequency);
+	general.emplace("MouseCheckFrequency", this->mouseCheckFrequency);
 	res.emplace("General", std::move(general));
 
 	toml::table hotkeys;
-	hotkeys.emplace("ShowUI", KeyCodeToString(vConfig.hotkeyShowUI));
-	hotkeys.emplace("CaptureCursor", KeyCodeToString(vConfig.hotkeyCaptureCursor));
+	hotkeys.emplace("ShowUI", KeyCodeToString(this->hotkeyShowUI));
+	hotkeys.emplace("CaptureCursor", KeyCodeToString(this->hotkeyCaptureCursor));
 	res.emplace("HotKeys", std::move(hotkeys));
 
 	toml::table profiles;
-	for (auto&& [vName, vProfile] : vConfig.profiles) {
+	for (auto&& [vName, vProfile] : this->profiles) {
 		toml::table profile;
 
 		profile.emplace("XboxCount", vProfile.x360Count);
@@ -126,71 +191,4 @@ toml::table SaveConfig(const Config& vConfig) {
 	res.emplace("Profiles", std::move(profiles));
 
 	return res;
-}
-
-static KeyCode ReadKeyCode(toml::node_view<const toml::node> t) {
-	auto str = t.value<std::string_view>();
-	if (str)
-		return KeyCodeFromString(str.value()).value_or(0xFF);
-	else
-		return 0xFF;
-}
-
-static void ReadJoystick(toml::node_view<const toml::node> t, ConfigJoystick& js) {
-	if (const auto& v = t["Type"];
-		v == "keyboard")
-		js.useMouse = false;
-	else if (v == "mouse")
-		js.useMouse = true;
-
-	js.speed = std::clamp(t["Speed"].value_or<float>(1.0f), 0.0f, 1.0f);
-	js.sensitivity = t["Sensitivity"].value_or<float>(50.0f);
-	js.nonLinear = t["NonLinearSensitivity"].value_or<float>(0.8f);
-	js.deadzone = t["Deadzone"].value_or<float>(0.02f);
-	js.invertXAxis = t["InvertXAxis"].value_or<bool>(false);
-	js.invertYAxis = t["InvertYAxis"].value_or<bool>(false);
-}
-
-Config LoadConfig(const toml::table& fConfig) {
-	Config config;
-
-	auto fGeneral = fConfig["General"];
-	config.mouseCheckFrequency = fGeneral["MouseCheckFrequency"].value_or<int>(75);
-
-	auto fHotkey = fConfig["HotKeys"];
-	config.hotkeyShowUI = ReadKeyCode(fHotkey["ShowUI"]);
-	config.hotkeyCaptureCursor = ReadKeyCode(fHotkey["CaptureCursor"]);
-
-	auto fProfiles = fConfig["Profiles"].as_table();
-	if (fProfiles) for (auto&& [key, val] : *fProfiles) {
-		auto e1 = val.as_table();
-		if (!e1) continue;
-		auto& fProfile = *e1;
-		auto fName = key.str();
-
-		ConfigProfile profile;
-
-		profile.x360Count = fProfile["XboxCount"].value_or(0);
-
-		auto fGamepads = fProfile["Gamepads"].as_array();
-		if (fGamepads) for (auto& val : *fGamepads) {
-			auto e1 = val.as_table();
-			if (!e1) continue;
-			auto& fGamepad = *e1;
-
-			ConfigGamepad gamepad;
-
-			for (unsigned char i = 0; i < kX360ButtonCount; ++i) {
-				gamepad.buttons[i] = ReadKeyCode(fGamepad[X360ButtonToString(static_cast<X360Button>(i))]);
-			}
-			ReadJoystick(fGamepad["LStick"], gamepad.lstick);
-			ReadJoystick(fGamepad["RStick"], gamepad.rstick);
-
-			profile.gamepads.push_back(std::move(gamepad));
-		}
-
-		config.profiles.try_emplace(std::string(fName), std::move(profile));
-	}
-
-	return config;
 }
