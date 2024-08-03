@@ -56,22 +56,22 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	}
 
 	case WM_SIZE: {
-		if (wParam == SIZE_MINIMIZED)
-			return 0;
-
 		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+
+		if (wParam == SIZE_MINIMIZED) {
+			--app.shownWindowCount;
+			return 0;
+		}
+
 		auto resizeWidth = static_cast<UINT>(LOWORD(lParam));
 		auto resizeHeight = static_cast<UINT>(HIWORD(lParam));
 		app.mainWindow.ResizeRenderTarget(resizeWidth, resizeHeight);
+		++app.shownWindowCount;
 		return 0;
 	}
 
-	case WM_CLOSE: {
-		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-
-		ShowWindow(hWnd, SW_HIDE);
-		--app.shownWindowCount;
-
+	case WM_DESTROY: {
+		PostQuitMessage(0);
 		return 0;
 	}
 
@@ -311,29 +311,29 @@ void App::MainRenderFrame() {
 
 LRESULT App::OnRawInput(RAWINPUT* ri) {
 	switch (ri->header.dwType) {
-		case RIM_TYPEMOUSE: {
-			const auto& mouse = ri->data.mouse;
+	case RIM_TYPEMOUSE: {
+		const auto& mouse = ri->data.mouse;
 
-			auto bf = mouse.usButtonFlags;
-			auto dev = ri->header.hDevice;
-			if (bf & RI_MOUSE_LEFT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_LBUTTON, true);
-			if (bf & RI_MOUSE_LEFT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_LBUTTON, false);
-			if (bf & RI_MOUSE_RIGHT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_RBUTTON, true);
-			if (bf & RI_MOUSE_RIGHT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_RBUTTON, false);
-			if (bf & RI_MOUSE_MIDDLE_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_MBUTTON, true);
-			if (bf & RI_MOUSE_MIDDLE_BUTTON_UP) feeder->HandleKeyPress(dev, VK_MBUTTON, false);
-			if (bf & RI_MOUSE_BUTTON_4_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON1, true);
-			if (bf & RI_MOUSE_BUTTON_4_UP) feeder->HandleKeyPress(dev, VK_XBUTTON1, false);
-			if (bf & RI_MOUSE_BUTTON_5_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON2, true);
-			if (bf & RI_MOUSE_BUTTON_5_UP) feeder->HandleKeyPress(dev, VK_XBUTTON2, false);
+		auto bf = mouse.usButtonFlags;
+		auto dev = ri->header.hDevice;
+		if (bf & RI_MOUSE_LEFT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_LBUTTON, true);
+		if (bf & RI_MOUSE_LEFT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_LBUTTON, false);
+		if (bf & RI_MOUSE_RIGHT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_RBUTTON, true);
+		if (bf & RI_MOUSE_RIGHT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_RBUTTON, false);
+		if (bf & RI_MOUSE_MIDDLE_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_MBUTTON, true);
+		if (bf & RI_MOUSE_MIDDLE_BUTTON_UP) feeder->HandleKeyPress(dev, VK_MBUTTON, false);
+		if (bf & RI_MOUSE_BUTTON_4_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON1, true);
+		if (bf & RI_MOUSE_BUTTON_4_UP) feeder->HandleKeyPress(dev, VK_XBUTTON1, false);
+		if (bf & RI_MOUSE_BUTTON_5_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON2, true);
+		if (bf & RI_MOUSE_BUTTON_5_UP) feeder->HandleKeyPress(dev, VK_XBUTTON2, false);
 
-			if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
-				LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
-				break;
-			} // else: MOUSE_MOVE_RELATIVE
+		if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
+			LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
+			break;
+		} // else: MOUSE_MOVE_RELATIVE
 
-			feeder->HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY);
-		} break;
+		feeder->HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY);
+	} break;
 
 	case RIM_TYPEKEYBOARD: {
 		const auto& kbd = ri->data.keyboard;
@@ -365,7 +365,7 @@ int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
 			TranslateMessage(&msg);
 			DispatchMessageW(&msg);
 			if (msg.message == WM_QUIT)
-				break;
+				goto exit;
 		}
 
 		// ... in which case the above loop breaks, and we come here (regular polling message pump) to process the rest, and then enter regular main loop doing rendering + polling
@@ -375,11 +375,11 @@ int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
 
 			// WM_QUIT is gaurenteed to only exist when there is nothing else in the message queue, we can safely exit immediately
 			if (msg.message == WM_QUIT)
-				break;
+				goto exit;
 		}
 
 		s.MainRenderFrame();
 	}
-
+exit:
 	return 0;
 }

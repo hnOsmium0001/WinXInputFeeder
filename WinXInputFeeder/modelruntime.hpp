@@ -31,8 +31,8 @@ struct X360Gamepad {
 	HANDLE srcKbd = INVALID_HANDLE_VALUE;
 	HANDLE srcMouse = INVALID_HANDLE_VALUE;
 
-	float accuMouseX;
-	float accuMouseY;
+	float accuMouseX = 0.0f;
+	float accuMouseY = 0.0f;
 	XUSB_REPORT state = {};
 
 	X360Button pendingRebindBtn = X360Button::None;
