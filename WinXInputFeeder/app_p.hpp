@@ -29,7 +29,7 @@ struct MainWindow {
 	~MainWindow();
 
 	void CreateRenderTarget();
-	void DestroyRenderTarget();
+	void DestroyRenderTarget() noexcept;
 	// Resize the render target after initial creation
 	// NOTE: at initial creation, the size is automatically pulled from the specified HWND by D3D
 	void ResizeRenderTarget(UINT width, UINT height);

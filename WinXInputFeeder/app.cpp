@@ -207,11 +207,13 @@ MainWindow::~MainWindow() {
 void MainWindow::CreateRenderTarget() {
 	ID3D11Texture2D* backBuffer;
 	swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
-	d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &mainRenderTargetView);
-	backBuffer->Release();
+	if (backBuffer) {
+		d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &mainRenderTargetView);
+		backBuffer->Release();
+	}
 }
 
-void MainWindow::DestroyRenderTarget() {
+void MainWindow::DestroyRenderTarget() noexcept {
 	if (mainRenderTargetView)
 		mainRenderTargetView->Release();
 }
@@ -227,7 +229,7 @@ static toml::table LoadConfigFile() {
 	try {
 		configFile = toml::parse_file(fs::path(L"config.toml"));
 	}
-	catch (const toml::parse_error& err) {
+	catch (const toml::parse_error&) {
 		return toml::table();
 	}
 

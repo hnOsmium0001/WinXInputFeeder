@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
 #include "inputdevice.hpp"
+#include "utils.hpp"
 
 #include <memory>
 #include <shellapi.h>
@@ -22,13 +23,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
 	int retval = 0;
 	
-	//try {
+#ifdef _DEBUG
+	retval = AppMain(hInstance, std::span(args.get(), argCount));
+#else
+	try {
 		retval = AppMain(hInstance, std::span(args.get(), argCount));
-	//}
-	//catch (const std::exception& err) {
-	//	fprintf(stderr, "Uncaught exception: %s\n", err.what());
-	//	retval = 255;
-	//}
+	}
+	catch (const std::exception& err) {
+		MessageBoxW(nullptr, Utf8ToWide(err.what()).c_str(), L"Fatal Error", MB_OK | MB_ICONERROR);
+		retval = 255;
+	}
+#endif
 
 	LocalFree(argList);
 
