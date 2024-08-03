@@ -2,8 +2,8 @@
 
 #include "modelconfig.hpp"
 
-struct AppState;
-struct FeederEngine;
+class App;
+class FeederEngine;
 
 class UIState {
 private:
@@ -16,7 +16,7 @@ public:
 	/* [Out] */ int bindIdevFromNextMouse = -1;
 
 public:
-	UIState(AppState&);
+	UIState(App&);
 	~UIState();
 
 	void OnFeederEngine(FeederEngine*);

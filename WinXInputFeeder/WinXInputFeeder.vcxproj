@@ -179,17 +179,17 @@
     </ClCompile>
     <ClCompile Include="modelconfig.cpp" />
     <ClCompile Include="inputdevice.cpp" />
-    <ClCompile Include="inputsrc.cpp" />
+    <ClCompile Include="app.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ui.cpp" />
     <ClCompile Include="modelruntime.cpp" />
     <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="inputsrc_p.hpp" />
+    <ClInclude Include="app_p.hpp" />
     <ClInclude Include="modelconfig.hpp" />
     <ClInclude Include="inputdevice.hpp" />
-    <ClInclude Include="inputsrc.hpp" />
+    <ClInclude Include="app.hpp" />
     <ClInclude Include="pch.hpp" />
     <ClInclude Include="ui.hpp" />
     <ClInclude Include="modelruntime.hpp" />

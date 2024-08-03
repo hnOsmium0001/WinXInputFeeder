@@ -9,7 +9,7 @@
 
 #include <memory>
 
-struct AppState;
+class App;
 
 // Wrap as struct for RAII helper
 // Not an encapsulated object in the OOP sense
@@ -25,7 +25,7 @@ struct MainWindow {
 	IDXGISwapChain* swapChain = nullptr;
 	ID3D11RenderTargetView* mainRenderTargetView = nullptr;
 
-	MainWindow(AppState& app, HINSTANCE hInstance);
+	MainWindow(App& app, HINSTANCE hInstance);
 	~MainWindow();
 
 	void CreateRenderTarget();
@@ -37,7 +37,8 @@ struct MainWindow {
 
 LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) noexcept;
 
-struct AppState {
+class App {
+public:
 	HINSTANCE hInstance;
 
 	MainWindow mainWindow;
@@ -56,8 +57,9 @@ struct AppState {
 	bool configDirty = false;
 	bool capturingCursor = false;
 
-	AppState(HINSTANCE hInstance);
-	~AppState();
+public:
+	App(HINSTANCE hInstance);
+	~App();
 
 	void MainRenderFrame();
 

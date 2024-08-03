@@ -2,8 +2,7 @@
 
 #include "ui.hpp"
 
-#include "inputsrc.hpp"
-#include "inputsrc_p.hpp" // TODO
+#include "app.hpp"
 #include "modelruntime.hpp"
 #include "utils.hpp"
 
@@ -34,7 +33,7 @@ struct UIStatePrivate {
 	void ShowButton(const X360Gamepad& gamepad, int gamepadId, X360Button btn, KeyCode boundKey);
 };
 
-UIState::UIState(AppState& app)
+UIState::UIState(App& app)
 	: p{ new UIStatePrivate(*this) }
 {
 }

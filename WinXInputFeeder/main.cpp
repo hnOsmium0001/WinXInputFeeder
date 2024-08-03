@@ -5,7 +5,7 @@
 #include <memory>
 #include <shellapi.h>
 
-// Sync declaration with the one in inputsrc.hpp
+// Sync declaration with the one in app.hpp
 // We declare separately instead of just including to avoid recompiling this file every time that header is changed
 int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args);
 

@@ -1,7 +1,7 @@
 ﻿#include "pch.hpp"
 
-#include "inputsrc.hpp"
-#include "inputsrc_p.hpp"
+#include "app.hpp"
+#include "app_p.hpp"
 
 #include "modelconfig.hpp"
 #include "modelruntime.hpp"
@@ -59,7 +59,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		if (wParam == SIZE_MINIMIZED)
 			return 0;
 
-		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 		auto resizeWidth = static_cast<UINT>(LOWORD(lParam));
 		auto resizeHeight = static_cast<UINT>(HIWORD(lParam));
 		app.mainWindow.ResizeRenderTarget(resizeWidth, resizeHeight);
@@ -67,7 +67,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	}
 
 	case WM_CLOSE: {
-		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
 		ShowWindow(hWnd, SW_HIDE);
 		--app.shownWindowCount;
@@ -76,7 +76,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	}
 
 	case WM_INPUT: {
-		auto& app = *reinterpret_cast<AppState*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
 		HRAWINPUT hri = (HRAWINPUT)lParam;
 
@@ -135,7 +135,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	return DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 
-MainWindow::MainWindow(AppState& app, HINSTANCE hInstance) {
+MainWindow::MainWindow(App& app, HINSTANCE hInstance) {
 	WNDCLASSEXW wc = {};
 	wc.cbSize = sizeof(wc);
 	wc.lpfnWndProc = MainWindowWndProc;
@@ -232,7 +232,7 @@ static FeederEngine MakeFeederEngine(ViGEm& vigem) {
 	return engine;
 }
 
-AppState::AppState(HINSTANCE hInstance)
+App::App(HINSTANCE hInstance)
 	: hInstance{ hInstance }
 	, mainWindow(*this, hInstance)
 	, mainUI(*this)
@@ -272,13 +272,13 @@ AppState::AppState(HINSTANCE hInstance)
 	ImGui_ImplDX11_Init(mainWindow.d3dDevice, mainWindow.d3dDeviceContext);
 }
 
-AppState::~AppState() {
+App::~App() {
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
 }
 
-void AppState::MainRenderFrame() {
+void App::MainRenderFrame() {
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
@@ -298,7 +298,7 @@ void AppState::MainRenderFrame() {
 	mainWindow.swapChain->Present(1, 0); // Present with vsync
 }
 
-LRESULT AppState::OnRawInput(RAWINPUT* ri) {
+LRESULT App::OnRawInput(RAWINPUT* ri) {
 	switch (ri->header.dwType) {
 		//case RIM_TYPEMOUSE: {
 		//	const auto& mouse = ri->data.mouse;
@@ -350,7 +350,7 @@ LRESULT AppState::OnRawInput(RAWINPUT* ri) {
 }
 
 int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
-	AppState s(hInstance);
+	App s(hInstance);
 
 	while (true) {
 		MSG msg;
