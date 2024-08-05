@@ -34,6 +34,7 @@ struct X360Gamepad {
 	float accuMouseX = 0.0f;
 	float accuMouseY = 0.0f;
 	float lastAngle = 0.0f;
+	int accuMouseEventCount = 0;
 	XUSB_REPORT state = {};
 
 	X360Button pendingRebindBtn = X360Button::None;

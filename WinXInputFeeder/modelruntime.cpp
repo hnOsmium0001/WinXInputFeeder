@@ -321,7 +321,7 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 	tilt = std::clamp(tilt, 0.0f, 1.0f);
 	tilt = (1 - tilt) < kSnapToFullFilt ? 1 : tilt;
 
-#define UNNORMALIZE(VAL) (VAL * 32767) 
+#define UNNORMALIZE(VAL) static_cast<short>(VAL * 32767) 
 
 #define STICK_MORE_VERTI(LOWERBOUND, UPPERBOUND, X_DIR, Y_DIR) \
 	if (phi >= LOWERBOUND && phi <= UPPERBOUND) { \
@@ -366,33 +366,31 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 	STICK_MORE_VERTI(pi/2, 3*pi/4, NEG_X, POS_Y);
 
 	// If nothing matched, reset stick
-	outX = 0.0f;
-	outY = 0.0f;
+	outX = 0;
+	outY = 0;
 }
 
 void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
-	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
-		auto& dev = x360s[gamepadId];
-		if (dev.srcMouse != hDevice) continue;
-
-		// dx, dy are in positive-right, positive-down
-		// results of atan2() are in traditional math positive-right, positive-up
-		dev.accuMouseX += dx;
-		dev.accuMouseY -= dy;
-	}
-}
-
-void FeederEngine::Update() {
 	constexpr float kOuterRadius = 10.0f;
 	constexpr float kBounceBack = 0.0f;
 
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& gamepad = currentProfile->second.gamepads[gamepadId];
 		auto& dev = x360s[gamepadId];
+		if (dev.srcMouse != hDevice) continue;
 
 		// Skip expensive calculations if both sticks don't use mouse2joystick
 		if (!gamepad.lstick.useMouse && !gamepad.rstick.useMouse)
 			continue;
+
+		// dx, dy are in positive-right, positive-down
+		// results of atan2() are in traditional math positive-right, positive-up
+		dev.accuMouseX += dx;
+		dev.accuMouseY -= dy;
+		if (++dev.accuMouseEventCount < 5) 
+			continue;
+		else
+			dev.accuMouseEventCount = 0;
 
 		float accuX = dev.accuMouseX;
 		float accuY = dev.accuMouseY;
@@ -427,7 +425,12 @@ void FeederEngine::Update() {
 
 		dev.accuMouseX = 0.0f;
 		dev.accuMouseY = 0.0f;
-
 		dev.SendReport();
+	}
+}
+
+void FeederEngine::Update() {
+	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
+
 	}
 }
