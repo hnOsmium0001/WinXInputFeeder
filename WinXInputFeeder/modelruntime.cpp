@@ -349,49 +349,31 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 
 	// Two cases with forward+right
 	// Tilt is forward and slightly right
-	STICK_MORE_VERTI(3*pi/2, 7*pi/4, POS_X, POS_Y);
+	STICK_MORE_VERTI(pi/4, pi/2, POS_X, POS_Y);
 	// Tilt is slightly forward and right.
-	STICK_MORE_HORIZ(7*pi/4, 2*pi, POS_X, POS_Y);
+	STICK_MORE_HORIZ(0, pi/4, POS_X, POS_Y);
 
 	// Two cases with right+downward
 	// Tilt is right and slightly downward.
-	STICK_MORE_HORIZ(0, pi/4, POS_X, NEG_Y);
+	STICK_MORE_HORIZ(-pi/4, 0, POS_X, NEG_Y);
 	// Tilt is downward and slightly right.
-	STICK_MORE_VERTI(pi/4, pi/2, POS_X, NEG_Y);
+	STICK_MORE_VERTI(-pi/2, -pi/4, POS_X, NEG_Y);
 
 	// Two cases with downward+left
 	// Tilt is downward and slightly left.
-	STICK_MORE_VERTI(pi/2, 3*pi/4, NEG_X, NEG_Y);
+	STICK_MORE_VERTI(-3*pi/4, -pi/2, NEG_X, NEG_Y);
 	// Tilt is left and slightly downward.
-	STICK_MORE_VERTI(3*pi/4, pi, NEG_X, NEG_Y);
+	STICK_MORE_HORIZ(-pi, -3*pi/4, NEG_X, NEG_Y);
 
 	// Two cases with forward+left
 	// Tilt is left and slightly forward.
-	STICK_MORE_HORIZ(pi, 5*pi/4, NEG_X, POS_Y);
+	STICK_MORE_HORIZ(3*pi/4, pi, NEG_X, POS_Y);
 	// Tilt is forward and slightly left.
-	STICK_MORE_VERTI(5*pi/4, 3*pi/2, NEG_X, POS_Y);
+	STICK_MORE_VERTI(pi/2, 3*pi/4, NEG_X, POS_Y);
 
 	// If nothing matched, reset stick
 	outX = 0;
 	outY = 0;
-}
-
-// A variant of atan2() that spits out [0,2π)
-static float Atan2Positive(float x, float y) {
-	if (x == 0.0f)
-		if (y > 0.0f)
-			return pi/2;
-		else
-			return 3*pi/2;
-	float phi = atan(y/x);
-	if (x < 0 && y > 0)
-		return phi + pi;
-	if (x < 0 && y <= 0)
-		return phi + pi;
-	if (x > 0 && y < 0)
-		return phi + 2*pi;
-	/* if (x > 0 && y >= 0) */
-	return phi;
 }
 
 void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
@@ -399,8 +381,10 @@ void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
 		auto& dev = x360s[gamepadId];
 		if (dev.srcMouse != hDevice) continue;
 
+		// dx, dy are in positive-right, positive-down
+		// results of atan2() are in traditional math positive-right, positive-up
 		dev.accuMouseX += dx;
-		dev.accuMouseY += dy;
+		dev.accuMouseY -= dy;
 	}
 }
 
@@ -423,13 +407,13 @@ void FeederEngine::Update() {
 		float r = sqrt(accuX * accuX + accuY * accuY);
 
 		// Clamp to a point on controller circle, if we are outside it
-		//if (r > kOuterRadius) {
-		//	accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
-		//	accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
-		//	r = sqrt(accuX * accuX + accuY * accuY);
-		//}
+		if (r > kOuterRadius) {
+			accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
+			accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
+			r = sqrt(accuX * accuX + accuY * accuY);
+		}
 
-		float phi = Atan2Positive(accuY, accuX);
+		float phi = atan2f(accuY, accuX);
 		dev.lastAngle = phi; //DBG
 
 		auto forStick = [&](const ConfigJoystick& conf, short& outX, short& outY) {
