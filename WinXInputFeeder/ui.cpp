@@ -201,6 +201,7 @@ void UIStatePrivate::ShowNavWindow() {
 	ImGui::SameLine();
 	if (ButtonDisablable("-", selectedGamepadId == -1)) {
 		feeder->RemoveGamepad(selectedGamepadId);
+		--selectedGamepadId;
 	}
 
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {

@@ -123,7 +123,7 @@ FeederEngine::FeederEngine(HWND eventHwnd, Config c, ViGEm& vigem)
 	if (!config.profiles.empty())
 		SelectProfile(&*config.profiles.begin());
 
-	mouseCheckTimer = SetTimer(eventHwnd, reinterpret_cast<UINT_PTR>(this), c.mouseCheckFrequency, MouseCheckTimeProc);
+	mouseCheckTimer = SetTimer(eventHwnd, reinterpret_cast<UINT_PTR>(this), config.mouseCheckFrequency, MouseCheckTimeProc);
 	if (!mouseCheckTimer)
 		LOG_DEBUG(L"Failed to register mouse check timer");
 }
@@ -183,8 +183,14 @@ bool FeederEngine::AddX360() {
 }
 
 bool FeederEngine::RemoveGamepad(int gamepadId) {
-	// TODO
-	return false;
+	if (gamepadId < 0 || gamepadId >= x360s.size())
+		return false;
+	currentProfile->second.RemoveGamepad(gamepadId);
+	if (gamepadId < x360s.size())
+		x360s.erase(x360s.begin() + gamepadId);
+	else
+		; // TODO
+	return true;
 }
 
 void FeederEngine::StartRebindX360Device(int gamepadId, IdevKind kind) {
@@ -321,7 +327,7 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 	tilt = std::clamp(tilt, 0.0f, 1.0f);
 	tilt = (1 - tilt) < kSnapToFullFilt ? 1 : tilt;
 
-#define UNNORMALIZE(VAL) (VAL * 32767) 
+#define UNNORMALIZE(VAL) static_cast<short>(VAL * 32767) 
 
 #define STICK_MORE_VERTI(LOWERBOUND, UPPERBOUND, X_DIR, Y_DIR) \
 	if (phi >= LOWERBOUND && phi <= UPPERBOUND) { \
@@ -366,8 +372,8 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 	STICK_MORE_VERTI(5*pi/4, 3*pi/2, NEG_X, POS_Y);
 
 	// If nothing matched, reset stick
-	outX = 0.0f;
-	outY = 0.0f;
+	outX = 0;
+	outY = 0;
 }
 
 // A variant of atan2() that spits out [0,2π)

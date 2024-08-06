@@ -71,6 +71,12 @@ std::pair<ConfigGamepad&, size_t> ConfigProfile::AddDS4() {
 	return { gamepads.front(), 0 };
 }
 
+void ConfigProfile::RemoveGamepad(size_t idx) {
+	gamepads.erase(gamepads.begin() + idx);
+	if (idx < x360Count)
+		--x360Count;
+}
+
 static void WriteJoystick(toml::table& profile, const ConfigJoystick& js) {
 	profile.emplace("Type", js.useMouse ? "mouse"s : "keyboard"s);
 	profile.emplace("Speed", js.speed);

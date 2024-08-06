@@ -113,6 +113,8 @@ struct ConfigProfile {
 	size_t GetDS4Count() const { return gamepads.size() - x360Count; }
 	std::span<ConfigGamepad> GetDS4s() { return std::span(gamepads.data() + x360Count, GetDS4Count()); }
 	std::pair<ConfigGamepad&, size_t> AddDS4();
+
+	void RemoveGamepad(size_t idx);
 };
 
 struct Config {
