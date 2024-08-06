@@ -414,7 +414,7 @@ void FeederEngine::Update() {
 		// Clamp to a point on controller circle, if we are outside it
 		if (r > kOuterRadius) {
 			accuX = round(accuX * (kOuterRadius - kBounceBack) / r);
-			accuX = round(accuY * (kOuterRadius - kBounceBack) / r);
+			accuY = round(accuY * (kOuterRadius - kBounceBack) / r);
 			r = sqrt(accuX * accuX + accuY * accuY);
 		}
 
