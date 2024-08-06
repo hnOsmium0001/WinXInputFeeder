@@ -84,12 +84,16 @@ private:
 
 	HWND eventHwnd;
 	UINT_PTR mouseCheckTimer;
+	POINT centerPos = {};
+public:
+	POINT mousePos;
 
 	Config::ProfileRefMut currentProfile = nullptr;
 	std::vector<X360Gamepad> x360s;
 	//std::vector<DualShockGamepad> dualshocks;
 	InputTranslationStruct its;
 
+	bool captureMouse = false;
 	bool configDirty = false;
 
 public:

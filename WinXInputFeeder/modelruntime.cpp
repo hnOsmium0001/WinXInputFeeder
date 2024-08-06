@@ -231,6 +231,16 @@ void FeederEngine::SetX360JoystickMode(int gamepadId, bool useRight, bool useMou
 }
 
 void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
+	if (vkey == VK_F1 && !pressed) {
+		captureMouse = !captureMouse;
+		if (captureMouse) {
+			RECT rect;
+			GetWindowRect(eventHwnd, &rect);
+			centerPos.x = (rect.right - rect.left) / 2;
+			centerPos.y = (rect.bottom - rect.top) / 2;
+		}
+	}
+
 	using enum X360Button;
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
@@ -371,31 +381,32 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 }
 
 void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
-	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
-		auto& dev = x360s[gamepadId];
-		if (dev.srcMouse != hDevice) continue;
-
-		// dx, dy are in positive-right, positive-down
-		// results of atan2() are in traditional math positive-right, positive-up
-		dev.accuMouseX += dx;
-		dev.accuMouseY -= dy;
-	}
 }
 
 void FeederEngine::Update() {
+	if (!captureMouse)
+		return;
+
 	constexpr float kOuterRadius = 10.0f;
 	constexpr float kBounceBack = 0.0f;
+
+	POINT cursorPos;
+	GetCursorPos(&cursorPos);
+	mousePos = cursorPos; ///DBG
+
+	float accuX = cursorPos.x - centerPos.x;
+	float accuY = -(cursorPos.y - centerPos.y);
+
+	SetCursorPos(centerPos.x, centerPos.y);
 
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& gamepad = currentProfile->second.gamepads[gamepadId];
 		auto& dev = x360s[gamepadId];
 
 		// Skip expensive calculations if both sticks don't use mouse2joystick
+		// TODO this is useless now, how?
 		if (!gamepad.lstick.useMouse && !gamepad.rstick.useMouse)
 			continue;
-
-		float accuX = dev.accuMouseX;
-		float accuY = dev.accuMouseY;
 
 		// Distance of mouse from center
 		float r = sqrt(accuX * accuX + accuY * accuY);
@@ -408,6 +419,8 @@ void FeederEngine::Update() {
 		}
 
 		float phi = atan2f(accuY, accuX);
+		dev.accuMouseX = accuX; //DBG
+		dev.accuMouseY = accuY; //DBG
 		dev.lastAngle = phi; //DBG
 
 		auto forStick = [&](const ConfigJoystick& conf, short& outX, short& outY) {
@@ -424,9 +437,6 @@ void FeederEngine::Update() {
 			}};
 		forStick(gamepad.lstick, dev.state.sThumbLX, dev.state.sThumbLY);
 		forStick(gamepad.rstick, dev.state.sThumbRX, dev.state.sThumbRY);
-
-		dev.accuMouseX = 0.0f;
-		dev.accuMouseY = 0.0f;
 
 		dev.SendReport();
 	}
