@@ -23,31 +23,31 @@
 #define DISCARD UNIQUE_NAME(_discard)
 
 struct SrwExclusiveLock {
-    SRWLOCK* theLock;
+	SRWLOCK* theLock;
 
-    SrwExclusiveLock(SRWLOCK& lock) noexcept
-        : theLock{ &lock }
-    {
-        AcquireSRWLockExclusive(theLock);
-    }
+	SrwExclusiveLock(SRWLOCK& lock) noexcept
+		: theLock{ &lock }
+	{
+		AcquireSRWLockExclusive(theLock);
+	}
 
-    ~SrwExclusiveLock() {
-        ReleaseSRWLockExclusive(theLock);
-    }
+	~SrwExclusiveLock() {
+		ReleaseSRWLockExclusive(theLock);
+	}
 };
 
 struct SrwSharedLock {
-    SRWLOCK* theLock;
+	SRWLOCK* theLock;
 
-    SrwSharedLock(SRWLOCK& lock) noexcept
-        : theLock{ &lock }
-    {
-        AcquireSRWLockShared(theLock);
-    }
+	SrwSharedLock(SRWLOCK& lock) noexcept
+		: theLock{ &lock }
+	{
+		AcquireSRWLockShared(theLock);
+	}
 
-    ~SrwSharedLock() {
-        ReleaseSRWLockShared(theLock);
-    }
+	~SrwSharedLock() {
+		ReleaseSRWLockShared(theLock);
+	}
 };
 
 std::wstring Utf8ToWide(std::string_view utf8);
@@ -58,17 +58,21 @@ std::string GetLastErrorStrUtf8() noexcept;
 
 // Our extension to toml++
 namespace toml {
-    toml::table parse_file(const std::filesystem::path& path);
+	toml::table parse_file(const std::filesystem::path& path);
 }
 
+#ifdef _DEBUG
 #define LOG_DEBUG(msg, ...) OutputDebugStringW(std::format(L"[WinXInputEmu] " msg, __VA_ARGS__).c_str())
+#else
+#define LOG_DEBUG(...)
+#endif
 
 template <typename TFunc>
 struct ScopeGuard {
-    TFunc func;
+	TFunc func;
 
-    ScopeGuard(TFunc func) noexcept : func{ std::move(func) } {}
-    ~ScopeGuard() { func(); }
+	ScopeGuard(TFunc func) noexcept : func{ std::move(func) } {}
+	~ScopeGuard() { func(); }
 };
 
 #define SCOPE_GUARD(name) ScopeGuard name = [&]()
@@ -78,25 +82,25 @@ struct ScopeGuard {
 
 template <typename TFunc>
 struct EventBus {
-    std::vector<std::function<TFunc>> callbacks;
+	std::vector<std::function<TFunc>> callbacks;
 
-    template <typename... Ts>
-    void operator()(Ts&&... args) const {
-        for (const auto& cb : callbacks) {
-            cb(std::forward<Ts>(args)...);
-        }
-    }
+	template <typename... Ts>
+	void operator()(Ts&&... args) const {
+		for (const auto& cb : callbacks) {
+			cb(std::forward<Ts>(args)...);
+		}
+	}
 
-    template <typename T>
-    void operator+=(T&& cb) {
-        callbacks.emplace_back(std::forward<T>(cb));
-    }
+	template <typename T>
+	void operator+=(T&& cb) {
+		callbacks.emplace_back(std::forward<T>(cb));
+	}
 };
 
 template <typename T>
 void SetUnsetBit(T& t, int nth, bool b) {
-    if (b)
-        t |= 1 << nth;
-    else
-        t &= ~(1 << nth);
+	if (b)
+		t |= 1 << nth;
+	else
+		t &= ~(1 << nth);
 }
