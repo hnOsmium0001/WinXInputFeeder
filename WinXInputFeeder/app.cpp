@@ -331,8 +331,25 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 		if (kbd.VKey > 0xFF)
 			break;
 
+		BYTE newVKey;
+		bool extended = kbd.Flags & RI_KEY_E0;
+		switch (kbd.VKey) {
+		case VK_SHIFT:
+			newVKey = MapVirtualKeyW(kbd.MakeCode, MAPVK_VSC_TO_VK_EX);
+			break;
+		case VK_CONTROL:
+			newVKey = extended ? VK_RCONTROL : VK_LCONTROL;
+			break;
+		case VK_MENU:
+			newVKey = extended ? VK_RMENU : VK_LMENU;
+			break;
+		default:
+			newVKey = kbd.VKey;
+			break;
+		}
 		bool press = !(kbd.Flags & RI_KEY_BREAK);
-		feeder->HandleKeyPress(ri->header.hDevice, (BYTE)kbd.VKey, press);
+
+		feeder->HandleKeyPress(ri->header.hDevice, newVKey, press);
 	} break;
 	}
 
