@@ -7,10 +7,14 @@
 #include "utils.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_stdlib.h>
 #include <string>
 
 using namespace std::literals;
+
+constexpr auto kLabelWidth = 80.0f;
+constexpr auto kButtonSize = ImVec2(80.0f, 20.0f);
 
 // Helper to display a little (?) mark which shows a tooltip when hovered.
 // In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
@@ -54,6 +58,49 @@ struct UIStatePrivate {
 
 	void ShowButton(const X360Gamepad& gamepad, int gamepadId, X360Button btn, KeyCode boundKey);
 };
+
+static void DrawJoystickCircle(ImGuiID id, float radius, SHORT x, SHORT y) {
+	auto window = ImGui::GetCurrentWindow();
+	float cursorX = window->DC.CursorPos.x;
+	float cursorY = window->DC.CursorPos.y;
+	ImRect rect{ cursorX, cursorY, cursorX + radius*2, cursorY + radius*2 };
+
+	ImGui::ItemSize(rect);
+	if (!ImGui::ItemAdd(rect, id))
+		return;
+
+	ImVec2 center{ cursorX + radius, cursorY + radius };
+
+	float normX = static_cast<float>(x) / MAXSHORT;
+	float normY = -static_cast<float>(y) / MAXSHORT;
+	ImVec2 pt{ center.x + normX * radius, center.y + normY * radius };
+
+	if (float dist = ImSqrt(normX*normX + normY*normY); dist > 1.0f) {
+		normX = normX / dist;
+		normY = normY / dist;
+	}
+	ImVec2 ptOnCircle{ center.x + normX * radius, center.y + normY * radius };
+
+	ImU32 borderColor = ImGui::GetColorU32(ImGuiCol_Button);
+	ImU32 ptColor = IM_COL32(255, 0, 0, 255);
+	ImU32 circleColor = IM_COL32(255, 247, 184, 255);
+	ImU32 rayColor = IM_COL32(255, 255, 0, 255);
+
+	auto cdl = window->DrawList;
+	cdl->AddRect(rect.Min, rect.Max, borderColor, 0.0f, 0, 2.0f);
+	cdl->AddCircle(center, radius, circleColor);
+	cdl->AddLine(center, pt, rayColor);
+	cdl->AddCircleFilled(ptOnCircle, 3.0f, rayColor);
+	cdl->AddCircleFilled(pt, 4.0f, ptColor);
+}
+
+static void ShowTextForKey(KeyCode boundKey, bool pressed) {
+	auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
+	ImGui::SetNextItemWidth(kLabelWidth);
+	if (pressed) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+	ImGui::TextUnformatted(boundKeyName);
+	if (pressed) ImGui::PopStyleColor();
+}
 
 UIState::UIState(App& app)
 	: p{ new UIStatePrivate(*this) }
@@ -122,7 +169,7 @@ void UIStatePrivate::ShowNavWindow() {
 				break;
 			}
 			++n;
-		} 
+		}
 		newProfileName.assign(buf, size);
 		ImGui::OpenPopup("Create Profile");
 	}
@@ -276,99 +323,93 @@ void UIStatePrivate::ShowDetailWindow() {
 	ImGui::Text("accuMouseY: %f", dev.accuMouseY);
 	ImGui::Text("lastAngle: %f", dev.lastAngle);
 
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
 	using enum X360Button;
-#define BUTTON(THE_BTN) ShowButton(dev, selectedGamepadId, THE_BTN, gamepad.buttons[static_cast<unsigned char>(THE_BTN)])
-	BUTTON(LStickUp);
-	ImGui::SameLine();
-	BUTTON(LStickDown);
-	ImGui::SameLine();
-	BUTTON(LStickLeft);
-	ImGui::SameLine();
-	BUTTON(LStickRight);
 
-	BUTTON(RStickUp);
-	ImGui::SameLine();
-	BUTTON(RStickDown);
-	ImGui::SameLine();
-	BUTTON(RStickLeft);
-	ImGui::SameLine();
-	BUTTON(RStickRight);
+	auto ShowButton = [&](X360Button btn) {
+		auto btnName = X360ButtonToString(btn).data();
+		if (ImGui::Button(btnName, kButtonSize))
+			feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
-	BUTTON(DPadUp);
-	ImGui::SameLine();
-	BUTTON(DPadDown);
-	ImGui::SameLine();
-	BUTTON(DPadLeft);
-	ImGui::SameLine();
-	BUTTON(DPadRight);
+		ImGui::SameLine();
+		ShowTextForKey(
+			/*button*/  gamepad.buttons[static_cast<unsigned char>(btn)],
+			/*pressed*/ dev.GetButton(X360ButtonToViGEm(btn)));
+		};
 
-	BUTTON(Start);
-	ImGui::SameLine();
-	BUTTON(Back);
+	auto ShowTrigger = [&](X360Button btn, BYTE triggerValue) {
+		const char* btnName = X360ButtonToString(btn).data();
+		if (ImGui::Button(btnName, kButtonSize))
+			feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
-	BUTTON(LeftThumb);
-	ImGui::SameLine();
-	BUTTON(RightThumb);
+		ImGui::SameLine();
+		ImGui::ProgressBar(static_cast<float>(triggerValue) / MAXBYTE, ImVec2(kLabelWidth, 0));
+		};
 
-	BUTTON(LeftShoulder);
-	ImGui::SameLine();
-	BUTTON(RightShoulder);
+	auto ShowStick = [&](X360Button thumbBtn, X360Button stickBtn1st, SHORT x, SHORT y) {
+		auto stickBtn1stIdx = static_cast<unsigned char>(stickBtn1st);
 
-	BUTTON(LeftTrigger);
-	BUTTON(RightTrigger);
+		ImGui::BeginGroup();
+		ShowButton(thumbBtn);
+		ImGui::Spacing();
+		for (unsigned char i = 0; i < 4; ++i) {
+			auto btn = static_cast<X360Button>(stickBtn1stIdx + i);
+			auto btnName = X360ButtonToString(btn).data();
+			if (ImGui::Button(btnName, kButtonSize))
+				feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
-	BUTTON(Guide);
+			ImGui::SameLine();
+			auto boundKey = gamepad.buttons[stickBtn1stIdx + i];
+			auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
+			ImGui::SetNextItemWidth(kLabelWidth);
+			ImGui::TextUnformatted(boundKeyName);
+		}
+		ImGui::EndGroup();
 
-	BUTTON(A);
+		ImGui::SameLine();
+		DrawJoystickCircle(ImGui::GetID("joystick"), 60.0f, x, y);
+		};
+	ShowStick(LeftThumb, LStickUp, dev.state.sThumbLX, dev.state.sThumbLY);
 	ImGui::SameLine();
-	BUTTON(B);
-	ImGui::SameLine();
-	BUTTON(X);
-	ImGui::SameLine();
-	BUTTON(Y);
-#undef BUTTON
+	ShowStick(RightThumb, RStickUp, dev.state.sThumbRX, dev.state.sThumbRY);
+
+	ImGui::Spacing();
+
+	ImGui::BeginGroup();
+	ShowButton(DPadUp);
+	ShowButton(DPadDown);
+	ShowButton(DPadLeft);
+	ShowButton(DPadRight);
+	ImGui::EndGroup();
+	ImGui::SameLine(); ImGui::BeginGroup();
+	ShowButton(Start);
+	ShowButton(Back);
+	ShowButton(Guide);
+	ImGui::EndGroup();
+	ImGui::SameLine(); ImGui::BeginGroup();
+	ShowButton(A);
+	ShowButton(B);
+	ShowButton(X);
+	ShowButton(Y);
+	ImGui::EndGroup();
+
+	ImGui::Spacing();
+
+	ImGui::BeginGroup();
+	ShowButton(LeftShoulder);
+	ShowButton(RightShoulder);
+	ImGui::EndGroup();
+
+	ImGui::BeginGroup();
+	ShowTrigger(LeftTrigger, dev.state.bLeftTrigger);
+	ShowTrigger(RightTrigger, dev.state.bRightTrigger);
+	ImGui::EndGroup();
 }
 
 void UIStatePrivate::ShowButton(const X360Gamepad& gamepad, int gamepadId, X360Button btn, KeyCode boundKey) {
 	using enum X360Button;
 
-	const char* name = X360ButtonToString(btn).data();
-
-	if (IsX360ButtonDirectMap(btn)) {
-		bool pressed = gamepad.GetButton(X360ButtonToViGEm(btn));
-		if (pressed) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-		if (ImGui::Button(name, ImVec2(80, 20)))
-			feeder->StartRebindX360Mapping(gamepadId, btn);
-		if (pressed) ImGui::PopStyleColor();
-	}
-	else {
-		int value;
-		float f1, f2;
-		switch (btn) {
-		case LeftTrigger: value = gamepad.state.bLeftTrigger; goto eitherTrigger;
-		case RightTrigger: value = gamepad.state.bRightTrigger; goto eitherTrigger;
-		eitherTrigger:
-			if (ImGui::Button(name, ImVec2(80, 20)))
-				feeder->StartRebindX360Mapping(gamepadId, btn);
-			ImGui::SameLine();
-			ImGui::Text("%d", value);
-			break;
-
-		case LStickUp: f1 = gamepad.state.sThumbLX; f2 = gamepad.state.sThumbLY; goto eitherStick;
-		case RStickUp: f1 = gamepad.state.sThumbRX; f2 = gamepad.state.sThumbRY; goto eitherStick;
-		eitherStick:
-			ImGui::Text("%f", f1 / MAXSHORT);
-			ImGui::SameLine();
-			ImGui::Text("%f", f2 / MAXSHORT);
-			ImGui::SameLine();
-			if (ImGui::Button(name, ImVec2(80, 20)))
-				feeder->StartRebindX360Mapping(gamepadId, btn);
-			break;
-
-		default:
-			if (ImGui::Button(name, ImVec2(80, 20)))
-				feeder->StartRebindX360Mapping(gamepadId, btn);
-			break;
-		}
-	}
 }
