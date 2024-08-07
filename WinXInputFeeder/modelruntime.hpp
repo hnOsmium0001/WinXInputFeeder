@@ -116,8 +116,11 @@ public:
 	void RebindX360Device(int gamepadId, IdevKind kind, HANDLE);
 
 	void StartRebindX360Mapping(int gamepadId, X360Button btn);
-	// TODO set joystick options in mouse mode
 	void SetX360JoystickMode(int gamepadId, bool useRight /* false: left */, bool useMouse /* false: keyboard */);
+	// TODO do it this way instead?
+	/*void SetX360JoystickParam(int gamepadId, bool leftright, ); */
+	// DO NOT CHANGE useMouse field to not cause desync - use SetX360JoystickMode instead
+	ConfigJoystick& GetX360JoystickParams(int gamepadId, bool leftright);
 
 	void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed);
 	void HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy);

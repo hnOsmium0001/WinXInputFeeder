@@ -16,17 +16,21 @@ using namespace std::literals;
 constexpr auto kLabelWidth = 80.0f;
 constexpr auto kButtonSize = ImVec2(80.0f, 20.0f);
 
-// Helper to display a little (?) mark which shows a tooltip when hovered.
-// In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
-static void HelpMarker(const char* desc) {
-	ImGui::SameLine();
-	ImGui::TextDisabled("(?)");
+static void HelpForItem(const char* desc) {
 	if (ImGui::BeginItemTooltip()) {
 		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
 		ImGui::TextUnformatted(desc);
 		ImGui::PopTextWrapPos();
 		ImGui::EndTooltip();
 	}
+}
+
+// Helper to display a little (?) mark which shows a tooltip when hovered.
+// In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
+static void HelpMarker(const char* desc) {
+	ImGui::SameLine();
+	ImGui::TextDisabled("(?)");
+	HelpForItem(desc);
 }
 
 static bool ButtonDisablable(const char* msg, bool disabled) {
@@ -349,32 +353,69 @@ void UIStatePrivate::ShowDetailWindow() {
 		ImGui::ProgressBar(static_cast<float>(triggerValue) / MAXBYTE, ImVec2(kLabelWidth, 0));
 		};
 
-	auto ShowStick = [&](X360Button thumbBtn, X360Button stickBtn1st, SHORT x, SHORT y) {
+	auto ShowStick = [&](bool leftright, SHORT x, SHORT y) {
+		X360Button thumbBtn = leftright ? RightThumb : LeftThumb;
+		X360Button stickBtn1st = leftright ? RStickUp : LStickUp;
 		auto stickBtn1stIdx = static_cast<unsigned char>(stickBtn1st);
 
-		ImGui::BeginGroup();
-		ShowButton(thumbBtn);
-		ImGui::Spacing();
-		for (unsigned char i = 0; i < 4; ++i) {
-			auto btn = static_cast<X360Button>(stickBtn1stIdx + i);
-			auto btnName = X360ButtonToString(btn).data();
-			if (ImGui::Button(btnName, kButtonSize))
-				feeder->StartRebindX360Mapping(selectedGamepadId, btn);
+		auto& opts = feeder->GetX360JoystickParams(selectedGamepadId, leftright);
 
-			ImGui::SameLine();
-			auto boundKey = gamepad.buttons[stickBtn1stIdx + i];
-			auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
-			ImGui::SetNextItemWidth(kLabelWidth);
-			ImGui::TextUnformatted(boundKeyName);
+		ImGui::PushID(leftright);
+		
+		ImGui::BeginGroup(); ImGui::PushItemWidth(kLabelWidth);
+
+		// 1st item
+		ShowButton(thumbBtn);
+
+		// 2nd item - toggle between mouse and keyboard
+		bool useMouse = opts.useMouse;
+		if (ImGui::Checkbox("Mouse?", &useMouse)) {
+			feeder->SetX360JoystickMode(selectedGamepadId, leftright, useMouse);
 		}
-		ImGui::EndGroup();
+		ImGui::Spacing();
+
+		// rest items
+		if (useMouse) {
+			ImGui::InputFloat("Sensitivity", &opts.sensitivity);
+			HelpForItem("Lower value corresponds to higher sensitivity.");
+
+			ImGui::SliderFloat("Non-Linear", &opts.nonLinear, 0.0f, 1.0f);
+			HelpForItem("1.0 is linear\n< 1.0 makes center more sensitive");
+
+			ImGui::SliderFloat("Deadzone", &opts.deadzone, 0.0f, 1.0f);
+
+			ImGui::Checkbox("Invert X-Axis", &opts.invertXAxis);
+
+			ImGui::Checkbox("Invert Y-Axis", &opts.invertYAxis);
+		}
+		else {
+			ImGui::PushItemWidth(kLabelWidth);
+			float speedPercent = opts.speed * 100;
+			ImGui::SliderFloat("Speed", &speedPercent, 0.0f, 100.0f, "%.0f%%");
+			opts.speed = speedPercent / 100;
+
+			for (unsigned char i = 0; i < 4; ++i) {
+				auto btn = static_cast<X360Button>(stickBtn1stIdx + i);
+				auto btnName = X360ButtonToString(btn).data();
+				if (ImGui::Button(btnName, kButtonSize))
+					feeder->StartRebindX360Mapping(selectedGamepadId, btn);
+
+				ImGui::SameLine();
+				auto boundKey = gamepad.buttons[stickBtn1stIdx + i];
+				auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
+				ImGui::SetNextItemWidth(kLabelWidth);
+				ImGui::TextUnformatted(boundKeyName);
+			}
+		}
+		ImGui::PopItemWidth(); ImGui::EndGroup();
 
 		ImGui::SameLine();
-		DrawJoystickCircle(ImGui::GetID("joystick"), 60.0f, x, y);
+		DrawJoystickCircle(ImGui::GetID("js"), 60.0f, x, y);
+		ImGui::PopID();
 		};
-	ShowStick(LeftThumb, LStickUp, dev.state.sThumbLX, dev.state.sThumbLY);
+	ShowStick(false, dev.state.sThumbLX, dev.state.sThumbLY);
 	ImGui::SameLine();
-	ShowStick(RightThumb, RStickUp, dev.state.sThumbRX, dev.state.sThumbRY);
+	ShowStick(true, dev.state.sThumbRX, dev.state.sThumbRY);
 
 	ImGui::Spacing();
 

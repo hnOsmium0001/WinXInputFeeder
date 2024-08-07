@@ -236,6 +236,11 @@ void FeederEngine::SetX360JoystickMode(int gamepadId, bool useRight, bool useMou
 	configDirty = true;
 }
 
+ConfigJoystick& FeederEngine::GetX360JoystickParams(int gamepadId, bool leftright) {
+	auto& gamepad = currentProfile->second.gamepads[gamepadId];
+	return leftright ? gamepad.rstick : gamepad.lstick;
+}
+
 void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
 	using enum X360Button;
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
