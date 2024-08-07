@@ -258,7 +258,6 @@ App::App(HINSTANCE hInstance)
 
 	ShowWindow(mainWindow.hWnd, SW_SHOWDEFAULT);
 	UpdateWindow(mainWindow.hWnd);
-	++shownWindowCount;
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
