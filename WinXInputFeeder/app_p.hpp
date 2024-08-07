@@ -7,6 +7,7 @@
 
 #include <ViGEm/Client.h>
 
+#include <bitset>
 #include <memory>
 
 class App;
@@ -52,6 +53,7 @@ public:
 	// We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end
 	std::unique_ptr<std::byte[]> rawinput;
 	size_t rawinputSize = 0;
+	std::bitset<0xFF> keyStates = {};
 
 	int shownWindowCount = 0;
 	bool configDirty = false;

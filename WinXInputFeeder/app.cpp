@@ -347,7 +347,13 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 			newVKey = kbd.VKey;
 			break;
 		}
+
+		bool prevPress = keyStates[newVKey];
 		bool press = !(kbd.Flags & RI_KEY_BREAK);
+		// Skip key repeats
+		if (prevPress == press)
+			break;
+		keyStates.set(newVKey, press);
 
 		feeder->HandleKeyPress(ri->header.hDevice, newVKey, press);
 	} break;

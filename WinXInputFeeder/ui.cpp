@@ -100,7 +100,6 @@ static void DrawJoystickCircle(ImGuiID id, float radius, SHORT x, SHORT y) {
 
 static void ShowTextForKey(KeyCode boundKey, bool pressed) {
 	auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
-	ImGui::SetNextItemWidth(kLabelWidth);
 	if (pressed) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
 	ImGui::TextUnformatted(boundKeyName);
 	if (pressed) ImGui::PopStyleColor();
