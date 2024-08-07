@@ -10,6 +10,7 @@
 #include "utils.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <d3d11.h>
@@ -88,28 +89,23 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		auto hDevice = reinterpret_cast<HANDLE>(lParam);
 
 		if (wParam == GIDC_ARRIVAL) {
-			for (const auto& idev : app.devices) {
-				if (idev.hDevice == hDevice)
-					return 0;
-			}
+			auto [it, success] = app.devices.try_emplace(hDevice, IdevDevice::FromHANDLE(hDevice));
+			assert(success);
+			auto& idev = it->second;
 
-			app.devices.push_back(IdevDevice::FromHANDLE(hDevice));
-			const auto& idev = app.devices.back();
-
-			LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
+			LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
 		}
 		else if (wParam == GIDC_REMOVAL) {
-			std::erase_if(
-				app.devices,
-				[&](const IdevDevice& idev) {
-					if (idev.hDevice == hDevice) {
-						LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
-						return true;
-					}
-					else {
-						return false;
-					}
-				});
+#if _DEBUG
+			auto iter = app.devices.find(hDevice);
+			if (iter == app.devices.end()) {
+				LOG_DEBUG("Error: recieved GIDC_REMOVAL for a device that had never GIDC_ARRIVAL-ed");
+				return 0;
+			}
+			auto& idev = iter->second;
+			LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
+#endif
+			app.devices.erase(hDevice);
 		}
 
 		return 0;

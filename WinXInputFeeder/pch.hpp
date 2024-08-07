@@ -36,7 +36,6 @@
 #include <Windows.h>
 
 #include <d3d11.h>
-#include <Rpc.h>
 #include <hidusage.h>
 #include <tlhelp32.h>
 #include <shellapi.h>
