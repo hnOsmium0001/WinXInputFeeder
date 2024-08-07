@@ -37,6 +37,3 @@ struct IdevDevice {
 
     static IdevDevice FromHANDLE(HANDLE hDevice);
 };
-
-// All pointer params are optional
-void PollInputDevices(std::vector<IdevDevice>& out);

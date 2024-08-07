@@ -8,6 +8,7 @@
 #include <ViGEm/Client.h>
 
 #include <bitset>
+#include <deque>
 #include <memory>
 
 class App;
@@ -48,6 +49,11 @@ public:
 	ViGEm vigem;
 
 	std::unique_ptr<FeederEngine> feeder;
+
+	// Use std::deque for pointer stability
+	// Stored in device insertion order, we don't expect there to be a ton of input devices (the Windows USB limit is there)
+	// and device insertion/removal should happen relatively rarely, so linear search is fine
+	std::deque<IdevDevice> devices;
 
 	// For a RAWINPUT*
 	// We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end

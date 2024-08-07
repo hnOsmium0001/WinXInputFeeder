@@ -319,33 +319,3 @@ IdevDevice IdevDevice::FromHANDLE(HANDLE hDevice) {
 
     return res;
 }
-
-void PollInputDevices(std::vector<IdevDevice>& out) {
-    UINT numDevices = 0;
-    RAWINPUTDEVICELIST* devices = nullptr;
-    DEFER{ free(devices); };
-    if (GetRawInputDeviceList(nullptr, &numDevices, sizeof(RAWINPUTDEVICELIST)) != 0)
-        return;
-
-    if (numDevices == 0)
-        return;
-
-    UINT numDevicesSuccessfullyFetched;
-    do {
-        auto newPtr = (RAWINPUTDEVICELIST*)realloc(devices, sizeof(RAWINPUTDEVICELIST) * numDevices);
-        if (newPtr == nullptr)
-            return;
-        else
-            devices = newPtr;
-
-        numDevicesSuccessfullyFetched = GetRawInputDeviceList(devices, &numDevices, sizeof(RAWINPUTDEVICELIST));
-    } while (numDevicesSuccessfullyFetched == (UINT)-1 && GetLastError() == ERROR_INSUFFICIENT_BUFFER);
-
-    if (numDevicesSuccessfullyFetched == (UINT)-1)
-        return;
-
-    for (UINT i = 0; i < numDevicesSuccessfullyFetched; i++) {
-        out.push_back(IdevDevice::FromHANDLE(devices[i].hDevice));
-        LOG_DEBUG("[PollInputDevices()] {} {}", devices[i].dwType, out.back().nameWide);
-    }
-}

@@ -64,7 +64,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	case WM_INPUT: {
 		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
-		HRAWINPUT hri = (HRAWINPUT)lParam;
+		auto hri = reinterpret_cast<HRAWINPUT>(lParam);
 
 		UINT size = 0;
 		GetRawInputData(hri, RID_INPUT, nullptr, &size, sizeof(RAWINPUTHEADER));
@@ -75,7 +75,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 		if (GetRawInputData(hri, RID_INPUT, app.rawinput.get(), &size, sizeof(RAWINPUTHEADER)) == (UINT)-1) {
 			LOG_DEBUG(L"GetRawInputData() failed");
-			break;
+			return 0;
 		}
 		RAWINPUT* ri = reinterpret_cast<RAWINPUT*>(app.rawinput.get());
 
@@ -83,38 +83,36 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 	}
 
 	case WM_INPUT_DEVICE_CHANGE: {
-		//HANDLE hDevice = (HANDLE)lParam;
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
-		//if (wParam == GIDC_ARRIVAL) {
-		//	// NOTE: WM_INPUT_DEVICE_CHANGE seem to fire when RIDEV_DEVNOTIFY is first set on a window, so we get duplicate devices here as the ones collected in _glfwPollKeyboardsWin32()
-		//	// Filter duplicate devices
-		//	for (const auto& idev : s.devices) {
-		//		if (idev.hDevice == hDevice)
-		//			return 0;
-		//	}
+		auto hDevice = reinterpret_cast<HANDLE>(lParam);
 
-		//	s.devices.push_back(IdevDevice::FromHANDLE(hDevice));
+		if (wParam == GIDC_ARRIVAL) {
+			for (const auto& idev : app.devices) {
+				if (idev.hDevice == hDevice)
+					return 0;
+			}
 
-		//	const auto& idev = s.devices.back();
-		//	LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
-		//}
-		//else if (wParam == GIDC_REMOVAL) {
-		//	// HACK: this relies on std::erase_if only visiting each element once (which is almost necessarily the case) but still technically not standard-compliant
-		//	//       for the behavior of "log the device being removed once"
-		//	std::erase_if(
-		//		s.devices,
-		//		[&](const IdevDevice& idev) {
-		//			if (idev.hDevice == hDevice) {
-		//				LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
-		//				return true;
-		//			}
-		//			else {
-		//				return false;
-		//			}
-		//		});
-		//}
+			app.devices.push_back(IdevDevice::FromHANDLE(hDevice));
+			const auto& idev = app.devices.back();
 
-		//return 0;
+			LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
+		}
+		else if (wParam == GIDC_REMOVAL) {
+			std::erase_if(
+				app.devices,
+				[&](const IdevDevice& idev) {
+					if (idev.hDevice == hDevice) {
+						LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), idev.nameWide);
+						return true;
+					}
+					else {
+						return false;
+					}
+				});
+		}
+
+		return 0;
 	}
 	}
 
@@ -344,7 +342,8 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 			newVKey = extended ? VK_RMENU : VK_LMENU;
 			break;
 		default:
-			newVKey = kbd.VKey;
+			// Explicitly cast to make MSVC shut up
+			newVKey = (BYTE)kbd.VKey;
 			break;
 		}
 
