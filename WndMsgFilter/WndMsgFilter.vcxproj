@@ -22,7 +22,6 @@
     <ClInclude Include="dll.hpp" />
     <ClInclude Include="filter.hpp" />
     <ClInclude Include="pch.hpp" />
-    <ClInclude Include="shadowed.h" />
     <ClInclude Include="utils.hpp" />
   </ItemGroup>
   <ItemGroup>

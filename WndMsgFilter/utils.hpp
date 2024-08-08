@@ -7,7 +7,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#define LOG_DEBUG(msg, ...) OutputDebugStringW(std::format(L"[WinXInputEmu] " msg, __VA_ARGS__).c_str())
+#define LOG_DEBUG(msg, ...) OutputDebugStringW(std::format(L"[WndMsgFilter] " msg, __VA_ARGS__).c_str())
 
 struct SrwExclusiveLock {
     SRWLOCK* theLock;
