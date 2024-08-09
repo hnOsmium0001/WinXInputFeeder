@@ -95,26 +95,10 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
 
 		auto hDevice = reinterpret_cast<HANDLE>(lParam);
-
-		if (wParam == GIDC_ARRIVAL) {
-			auto [it, success] = app.devices.try_emplace(hDevice, IdevDevice::FromHANDLE(hDevice));
-			assert(success);
-			auto& idev = it->second;
-
-			LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
-		}
-		else if (wParam == GIDC_REMOVAL) {
-#if _DEBUG
-			auto iter = app.devices.find(hDevice);
-			if (iter == app.devices.end()) {
-				LOG_DEBUG("Error: recieved GIDC_REMOVAL for a device that had never GIDC_ARRIVAL-ed");
-				return 0;
-			}
-			auto& idev = iter->second;
-			LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
-#endif
-			app.devices.erase(hDevice);
-		}
+		if (wParam == GIDC_ARRIVAL)
+			app.OnIdevConnect(hDevice);
+		else if (wParam == GIDC_REMOVAL)
+			app.OnIdevDisconnect(hDevice);
 
 		return 0;
 	}
@@ -334,30 +318,31 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 	switch (ri->header.dwType) {
 	case RIM_TYPEMOUSE: {
 		const auto& mouse = ri->data.mouse;
+		auto& idev = FindIdev(ri->header.hDevice);
 
 		auto bf = mouse.usButtonFlags;
-		auto dev = ri->header.hDevice;
-		if (bf & RI_MOUSE_LEFT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_LBUTTON, true);
-		if (bf & RI_MOUSE_LEFT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_LBUTTON, false);
-		if (bf & RI_MOUSE_RIGHT_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_RBUTTON, true);
-		if (bf & RI_MOUSE_RIGHT_BUTTON_UP) feeder->HandleKeyPress(dev, VK_RBUTTON, false);
-		if (bf & RI_MOUSE_MIDDLE_BUTTON_DOWN) feeder->HandleKeyPress(dev, VK_MBUTTON, true);
-		if (bf & RI_MOUSE_MIDDLE_BUTTON_UP) feeder->HandleKeyPress(dev, VK_MBUTTON, false);
-		if (bf & RI_MOUSE_BUTTON_4_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON1, true);
-		if (bf & RI_MOUSE_BUTTON_4_UP) feeder->HandleKeyPress(dev, VK_XBUTTON1, false);
-		if (bf & RI_MOUSE_BUTTON_5_DOWN) feeder->HandleKeyPress(dev, VK_XBUTTON2, true);
-		if (bf & RI_MOUSE_BUTTON_5_UP) feeder->HandleKeyPress(dev, VK_XBUTTON2, false);
+		if (bf & RI_MOUSE_LEFT_BUTTON_DOWN) feeder->HandleKeyPress(idev, VK_LBUTTON, true);
+		if (bf & RI_MOUSE_LEFT_BUTTON_UP) feeder->HandleKeyPress(idev, VK_LBUTTON, false);
+		if (bf & RI_MOUSE_RIGHT_BUTTON_DOWN) feeder->HandleKeyPress(idev, VK_RBUTTON, true);
+		if (bf & RI_MOUSE_RIGHT_BUTTON_UP) feeder->HandleKeyPress(idev, VK_RBUTTON, false);
+		if (bf & RI_MOUSE_MIDDLE_BUTTON_DOWN) feeder->HandleKeyPress(idev, VK_MBUTTON, true);
+		if (bf & RI_MOUSE_MIDDLE_BUTTON_UP) feeder->HandleKeyPress(idev, VK_MBUTTON, false);
+		if (bf & RI_MOUSE_BUTTON_4_DOWN) feeder->HandleKeyPress(idev, VK_XBUTTON1, true);
+		if (bf & RI_MOUSE_BUTTON_4_UP) feeder->HandleKeyPress(idev, VK_XBUTTON1, false);
+		if (bf & RI_MOUSE_BUTTON_5_DOWN) feeder->HandleKeyPress(idev, VK_XBUTTON2, true);
+		if (bf & RI_MOUSE_BUTTON_5_UP) feeder->HandleKeyPress(idev, VK_XBUTTON2, false);
 
 		if (mouse.usFlags & MOUSE_MOVE_ABSOLUTE) {
 			LOG_DEBUG("Warning: RAWINPUT reported absolute mouse corrdinates, not supported");
 			break;
 		} // else: MOUSE_MOVE_RELATIVE
 
-		feeder->HandleMouseMovement(ri->header.hDevice, mouse.lLastX, mouse.lLastY);
+		feeder->HandleMouseMovement(idev, mouse.lLastX, mouse.lLastY);
 	} break;
 
 	case RIM_TYPEKEYBOARD: {
 		const auto& kbd = ri->data.keyboard;
+		auto& idev = FindIdev(ri->header.hDevice);
 
 		// This message is a part of a longer makecode sequence -- the actual Vkey is in another one
 		if (kbd.VKey == 0xFF)
@@ -384,18 +369,48 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 			break;
 		}
 
-		bool prevPress = keyStates[newVKey];
+		bool prevPress = idev.keyStates[newVKey];
 		bool press = !(kbd.Flags & RI_KEY_BREAK);
 		// Skip key repeats
 		if (prevPress == press)
 			break;
-		keyStates.set(newVKey, press);
+		idev.keyStates.set(newVKey, press);
 
-		feeder->HandleKeyPress(ri->header.hDevice, newVKey, press);
+		feeder->HandleKeyPress(idev, newVKey, press);
 	} break;
 	}
 
 	return 0;
+}
+
+IdevDevice& App::FindIdev(HANDLE hDevice) {
+	auto iter = devices.find(hDevice);
+	if (iter != devices.end())
+		return iter->second;
+	else
+		return OnIdevConnect(hDevice);
+}
+
+IdevDevice& App::OnIdevConnect(HANDLE hDevice) {
+	auto [it, success] = devices.try_emplace(hDevice, IdevDevice::FromHANDLE(hDevice));
+	assert(success);
+	auto& idev = it->second;
+
+	LOG_DEBUG("Connected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
+	return idev;
+}
+
+void App::OnIdevDisconnect(HANDLE hDevice) {
+#if _DEBUG
+	auto iter = devices.find(hDevice);
+	if (iter == devices.end()) {
+		LOG_DEBUG("Error: recieved GIDC_REMOVAL for a device that had never GIDC_ARRIVAL-ed");
+		return;
+	}
+	auto& idev = iter->second;
+	LOG_DEBUG("Disconnected {} {}", RawInputTypeToString(idev.info.dwType), Utf8ToWide(idev.nameUtf8));
+#endif
+	devices.erase(hDevice);
 }
 
 void App::OnDpiChanged(UINT newDpi, bool recreateAtlas) {

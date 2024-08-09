@@ -241,8 +241,11 @@ ConfigJoystick& FeederEngine::GetX360JoystickParams(int gamepadId, bool leftrigh
 	return leftright ? gamepad.rstick : gamepad.lstick;
 }
 
-void FeederEngine::HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed) {
+void FeederEngine::HandleKeyPress(const IdevDevice& idev, BYTE vkey, bool pressed) {
 	using enum X360Button;
+
+	HANDLE hDevice = idev.hDevice;
+
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
 		auto& gamepad = currentProfile->second.gamepads[gamepadId];
@@ -381,7 +384,9 @@ static void CalcJoystickPosition(float phi, float tilt, bool invertX, bool inver
 	outY = 0;
 }
 
-void FeederEngine::HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy) {
+void FeederEngine::HandleMouseMovement(const IdevDevice& idev, LONG dx, LONG dy) {
+	HANDLE hDevice = idev.hDevice;
+
 	for (int gamepadId = 0; gamepadId < x360s.size(); ++gamepadId) {
 		auto& dev = x360s[gamepadId];
 		if (dev.srcMouse != hDevice) continue;

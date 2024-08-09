@@ -7,7 +7,6 @@
 
 #include <ViGEm/Client.h>
 
-#include <bitset>
 #include <memory>
 #include <unordered_map>
 
@@ -57,7 +56,6 @@ public:
 	// We have to use a manually sized buffer, because RAWINPUT uses a flexible array member at the end
 	std::unique_ptr<std::byte[]> rawinput;
 	size_t rawinputSize = 0;
-	std::bitset<0xFF> keyStates = {};
 
 	float scaleFactor = 1.0f;
 	int shownWindowCount = 0;
@@ -70,7 +68,11 @@ public:
 
 	void MainRenderFrame();
 
+	IdevDevice& FindIdev(HANDLE hDevice);
+
 	// DO NOT CALL when inside an ImGui frame (i.e. in MainRenderFrame)
+	IdevDevice& OnIdevConnect(HANDLE hDevice);
+	void OnIdevDisconnect(HANDLE hDevice);
 	void OnDpiChanged(UINT newDpi, bool recreateAtlas = true);
 	LRESULT OnRawInput(RAWINPUT*);
 };

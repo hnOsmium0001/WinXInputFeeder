@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -27,6 +28,7 @@ enum class IdevKind {
 struct IdevDevice {
     HANDLE hDevice = INVALID_HANDLE_VALUE;
     std::string nameUtf8;
+    std::bitset<0xFF> keyStates = {};
     RID_DEVICE_INFO info;
     USHORT vendorId;
     USHORT productId;

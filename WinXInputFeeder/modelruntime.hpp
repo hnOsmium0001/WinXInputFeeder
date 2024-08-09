@@ -122,8 +122,8 @@ public:
 	// DO NOT CHANGE useMouse field to not cause desync - use SetX360JoystickMode instead
 	ConfigJoystick& GetX360JoystickParams(int gamepadId, bool leftright);
 
-	void HandleKeyPress(HANDLE hDevice, BYTE vkey, bool pressed);
-	void HandleMouseMovement(HANDLE hDevice, LONG dx, LONG dy);
+	void HandleKeyPress(const IdevDevice& idev, BYTE vkey, bool pressed);
+	void HandleMouseMovement(const IdevDevice& idev, LONG dx, LONG dy);
 	// Send joystick state generated from mouse to ViGEm
 	// Triggered on a timer
 	void Update();
