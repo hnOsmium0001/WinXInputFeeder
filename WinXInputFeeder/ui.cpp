@@ -186,9 +186,9 @@ void UIStatePrivate::ShowNavWindow() {
 
 		if (ImGui::IsWindowAppearing())
 			ImGui::SetKeyboardFocusHere(); // On InputText
-		if ((ImGui::InputText("Name", &newProfileName, ImGuiInputTextFlags_EnterReturnsTrue) && !invalid) ||
-			ButtonDisablable("Confirm", invalid))
-		{
+		bool enterPressed = ImGui::InputText("Name", &newProfileName, ImGuiInputTextFlags_EnterReturnsTrue);
+		bool confirmClicked = ButtonDisablable("Confirm", invalid);
+		if ((enterPressed && !invalid) || confirmClicked) {
 			feeder->AddProfile(newProfileName);
 			feeder->SelectProfile(&*config.profiles.find(newProfileName));
 			ImGui::CloseCurrentPopup();
