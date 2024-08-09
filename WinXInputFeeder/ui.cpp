@@ -13,9 +13,6 @@
 
 using namespace std::literals;
 
-constexpr auto kLabelWidth = 80.0f;
-constexpr auto kButtonSize = ImVec2(80.0f, 20.0f);
-
 static void HelpForItem(const char* desc) {
 	if (ImGui::BeginItemTooltip()) {
 		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
@@ -332,9 +329,12 @@ void UIStatePrivate::ShowDetailWindow() {
 
 	using enum X360Button;
 
+	float labelWidth = ImGui::GetFontSize() * 8.0f;
+	ImVec2 buttonSize(labelWidth, 0.0f);
+
 	auto ShowButton = [&](X360Button btn) {
 		auto btnName = X360ButtonToString(btn).data();
-		if (ImGui::Button(btnName, kButtonSize))
+		if (ImGui::Button(btnName, buttonSize))
 			feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
 		ImGui::SameLine();
@@ -345,11 +345,11 @@ void UIStatePrivate::ShowDetailWindow() {
 
 	auto ShowTrigger = [&](X360Button btn, BYTE triggerValue) {
 		const char* btnName = X360ButtonToString(btn).data();
-		if (ImGui::Button(btnName, kButtonSize))
+		if (ImGui::Button(btnName, buttonSize))
 			feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
 		ImGui::SameLine();
-		ImGui::ProgressBar(static_cast<float>(triggerValue) / MAXBYTE, ImVec2(kLabelWidth, 0));
+		ImGui::ProgressBar(static_cast<float>(triggerValue) / MAXBYTE, ImVec2(labelWidth, 0));
 		};
 
 	auto ShowStick = [&](bool leftright, SHORT x, SHORT y) {
@@ -360,8 +360,8 @@ void UIStatePrivate::ShowDetailWindow() {
 		auto& opts = feeder->GetX360JoystickParams(selectedGamepadId, leftright);
 
 		ImGui::PushID(leftright);
-		
-		ImGui::BeginGroup(); ImGui::PushItemWidth(kLabelWidth);
+
+		ImGui::BeginGroup(); ImGui::PushItemWidth(labelWidth);
 
 		// 1st item
 		ShowButton(thumbBtn);
@@ -388,7 +388,7 @@ void UIStatePrivate::ShowDetailWindow() {
 			ImGui::Checkbox("Invert Y-Axis", &opts.invertYAxis);
 		}
 		else {
-			ImGui::PushItemWidth(kLabelWidth);
+			ImGui::PushItemWidth(labelWidth);
 			float speedPercent = opts.speed * 100;
 			ImGui::SliderFloat("Speed", &speedPercent, 0.0f, 100.0f, "%.0f%%");
 			opts.speed = speedPercent / 100;
@@ -396,20 +396,20 @@ void UIStatePrivate::ShowDetailWindow() {
 			for (unsigned char i = 0; i < 4; ++i) {
 				auto btn = static_cast<X360Button>(stickBtn1stIdx + i);
 				auto btnName = X360ButtonToString(btn).data();
-				if (ImGui::Button(btnName, kButtonSize))
+				if (ImGui::Button(btnName, buttonSize))
 					feeder->StartRebindX360Mapping(selectedGamepadId, btn);
 
 				ImGui::SameLine();
 				auto boundKey = gamepad.buttons[stickBtn1stIdx + i];
 				auto boundKeyName = boundKey == 0xFF ? "" : KeyCodeToString(boundKey).data();
-				ImGui::SetNextItemWidth(kLabelWidth);
+				ImGui::SetNextItemWidth(labelWidth);
 				ImGui::TextUnformatted(boundKeyName);
 			}
 		}
 		ImGui::PopItemWidth(); ImGui::EndGroup();
 
 		ImGui::SameLine();
-		DrawJoystickCircle(ImGui::GetID("js"), 60.0f, x, y);
+		DrawJoystickCircle(ImGui::GetID("js"), labelWidth/2, x, y);
 		ImGui::PopID();
 		};
 	ShowStick(false, dev.state.sThumbLX, dev.state.sThumbLY);

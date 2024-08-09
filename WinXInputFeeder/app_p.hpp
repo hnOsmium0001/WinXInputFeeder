@@ -50,6 +50,7 @@ public:
 
 	std::unique_ptr<FeederEngine> feeder;
 
+	std::unordered_map<UINT, ImFont*> fonts;
 	std::unordered_map<HANDLE, IdevDevice> devices;
 
 	// For a RAWINPUT*
@@ -58,6 +59,7 @@ public:
 	size_t rawinputSize = 0;
 	std::bitset<0xFF> keyStates = {};
 
+	float scaleFactor = 1.0f;
 	int shownWindowCount = 0;
 	bool configDirty = false;
 	bool capturingCursor = false;
@@ -68,5 +70,7 @@ public:
 
 	void MainRenderFrame();
 
+	// DO NOT CALL when inside an ImGui frame (i.e. in MainRenderFrame)
+	void OnDpiChanged(UINT newDpi, bool recreateAtlas = true);
 	LRESULT OnRawInput(RAWINPUT*);
 };

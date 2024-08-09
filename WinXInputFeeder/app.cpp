@@ -19,6 +19,7 @@
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 #include <memory>
+#include <shellscalingapi.h>
 #include <utility>
 #include <vector>
 #include <hidusage.h>
@@ -55,6 +56,13 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 		app.mainWindow.ResizeRenderTarget(resizeWidth, resizeHeight);
 		++app.shownWindowCount;
 		return 0;
+	}
+
+	case WM_KEYDOWN: {
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+		if (wParam == VK_DOWN)
+			app.OnDpiChanged(96);
+		break;
 	}
 
 	case WM_DESTROY: {
@@ -110,6 +118,22 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 		return 0;
 	}
+
+	case WM_DPICHANGED: {
+		auto& app = *reinterpret_cast<App*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+
+		auto newRect = reinterpret_cast<RECT*>(lParam);
+		SetWindowPos(hWnd,
+			nullptr,
+			newRect->left,
+			newRect->top,
+			newRect->right - newRect->left,
+			newRect->bottom - newRect->top,
+			SWP_NOZORDER | SWP_NOACTIVATE);
+		
+		app.OnDpiChanged(HIWORD(wParam));
+		break;
+	}
 	}
 
 	return DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -125,6 +149,14 @@ MainWindow::MainWindow(App& app, HINSTANCE hInstance) {
 	if (!hWc)
 		throw std::runtime_error(std::format("Error creating main window class: {}", GetLastErrorStrUtf8()));
 
+	HMONITOR monitor = MonitorFromPoint(POINT{ 0,0 }, MONITOR_DEFAULTTOPRIMARY);
+	// https://learn.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor
+	// "The values of *dpiX and *dpiY are identical. You only need to record one of the values to determine the DPI and respond appropriately."
+	UINT dpiX, dpiY;
+	if (FAILED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
+		dpiX = USER_DEFAULT_SCREEN_DPI;
+	auto scaleFactor = static_cast<float>(dpiX) / USER_DEFAULT_SCREEN_DPI;
+
 	hWnd = CreateWindowExW(
 		0,
 		MAKEINTATOM(hWc),
@@ -134,9 +166,9 @@ MainWindow::MainWindow(App& app, HINSTANCE hInstance) {
 		// Position
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		// Size
-		1024, 640,
+		static_cast<int>(1024 * scaleFactor), static_cast<int>(640 * scaleFactor),
 
-		NULL,  // Parent window    
+		NULL,  // Parent window
 		NULL,  // Menu
 		NULL,  // Instance handle
 		reinterpret_cast<LPVOID>(&app)
@@ -259,6 +291,9 @@ App::App(HINSTANCE hInstance)
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.IniFilename = "imgui_state.ini";
 
+	UINT dpi = GetDpiForWindow(mainWindow.hWnd);
+	OnDpiChanged(dpi, false);
+
 	ImGui_ImplWin32_Init(mainWindow.hWnd);
 	ImGui_ImplDX11_Init(mainWindow.d3dDevice, mainWindow.d3dDeviceContext);
 }
@@ -355,6 +390,32 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 	}
 
 	return 0;
+}
+
+void App::OnDpiChanged(UINT newDpi, bool recreateAtlas) {
+	scaleFactor = static_cast<float>(newDpi) / USER_DEFAULT_SCREEN_DPI;
+	
+	auto& io = ImGui::GetIO();
+	auto& style = ImGui::GetStyle();
+
+	// Yes, we are leaking as the user switch between different DPIs
+	// But having so many monitors of different DPI, _and_ constantly dragging the window between them to cause exceesive memory usage seems very unlikely
+	ImFont* font;
+	auto iter = fonts.find(newDpi);
+	if (iter != fonts.end())
+		font = iter->second;
+	else {
+		font = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/segoeui.ttf", 16.0f * scaleFactor);
+		io.Fonts->Build();
+		if (recreateAtlas)
+			// https://github.com/ocornut/imgui/issues/2311#issuecomment-460039964
+			ImGui_ImplDX11_InvalidateDeviceObjects();
+		fonts.emplace(newDpi, font);
+	}
+
+	io.FontDefault = font;
+	style = {};
+	style.ScaleAllSizes(scaleFactor);
 }
 
 int AppMain(HINSTANCE hInstance, std::span<const std::wstring_view> args) {
