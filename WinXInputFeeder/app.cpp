@@ -130,7 +130,7 @@ LRESULT CALLBACK MainWindowWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 			newRect->right - newRect->left,
 			newRect->bottom - newRect->top,
 			SWP_NOZORDER | SWP_NOACTIVATE);
-		
+
 		app.OnDpiChanged(HIWORD(wParam));
 		break;
 	}
@@ -157,6 +157,11 @@ MainWindow::MainWindow(App& app, HINSTANCE hInstance) {
 		dpiX = USER_DEFAULT_SCREEN_DPI;
 	auto scaleFactor = static_cast<float>(dpiX) / USER_DEFAULT_SCREEN_DPI;
 
+	RECT wndRect{};
+	wndRect.right = static_cast<LONG>(1024 * scaleFactor);
+	wndRect.bottom = static_cast<LONG>(640 * scaleFactor);
+	AdjustWindowRectExForDpi(&wndRect, WS_OVERLAPPEDWINDOW, false, WS_EX_OVERLAPPEDWINDOW, dpiX);
+
 	hWnd = CreateWindowExW(
 		0,
 		MAKEINTATOM(hWc),
@@ -166,7 +171,8 @@ MainWindow::MainWindow(App& app, HINSTANCE hInstance) {
 		// Position
 		CW_USEDEFAULT, CW_USEDEFAULT,
 		// Size
-		static_cast<int>(1024 * scaleFactor), static_cast<int>(640 * scaleFactor),
+		wndRect.right - wndRect.left,
+		wndRect.bottom - wndRect.top,
 
 		NULL,  // Parent window
 		NULL,  // Menu
@@ -394,7 +400,7 @@ LRESULT App::OnRawInput(RAWINPUT* ri) {
 
 void App::OnDpiChanged(UINT newDpi, bool recreateAtlas) {
 	scaleFactor = static_cast<float>(newDpi) / USER_DEFAULT_SCREEN_DPI;
-	
+
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 
