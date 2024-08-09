@@ -1,6 +1,8 @@
 #pragma once
 
-#include <minwindef.h>
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 // Defined in dllmain.cpp
 
